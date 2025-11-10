@@ -59,6 +59,10 @@ bool mouseDisabled = false;
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
 
+// Add near other globals
+static float gAmbient = 0.05f;
+static float gSSAOStrength = 1.0f;
+
 int main()
 {
   // Initialize GLFW
@@ -173,7 +177,7 @@ int main()
   Shader deferredGeometryShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred.vs").c_str(),
       (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred.fs").c_str(),
-      "deferredGeometryShader");
+      "deferredGeometry");
   // Shader deferredLightingShader("data/shaders/fullscreen_quad.vs", "data/shaders/deferred_lighting.fs", "deferredLightingShader");
   Shader deferredLightingShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
@@ -295,6 +299,11 @@ int main()
       (std::string(RUNTIME_DATA_DIR) + "/shaders/lights.fs").c_str(),
       "lightVolumeShader");
 
+  Shader lightPassShader(
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/light_pass.vs").c_str(),
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/light_pass.fs").c_str(),
+      "lightPassShader");
+
   // render loop
   // -----------
   while (!glfwWindowShouldClose(window))
@@ -355,105 +364,96 @@ int main()
     deferredGeometryShader.use();
     deferredGeometryShader.setMat4("projection", projection);
     deferredGeometryShader.setMat4("view", view);
-    glm::mat4 modelMat(1.0f);
-    deferredGeometryShader.setMat4("model", modelMat);
-    deferredGeometryShader.setFloat("uTime", currentFrame);
+    deferredGeometryShader.setMat4("model", glm::mat4(1.0f));
+    deferredGeometryShader.setFloat("uTime", (float)glfwGetTime());
     myModel.Draw(deferredGeometryShader);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // SSAO pass
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
     ssaoShader.use();
     ssaoShader.setMat4("projection", projection);
+    ssaoShader.setMat4("invProjection", glm::inverse(projection));
+    ssaoShader.setMat4("invView", glm::inverse(view));
     ssaoShader.setFloat("radius", 0.5f);
     ssaoShader.setFloat("bias", 0.025f);
-    for (int i = 0; i < 64; i++)
-      ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+    // bind inputs
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texPosition);
-    ssaoShader.setInt("gPosition", 0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormalRough);
+    ssaoShader.setInt("gNormalRough", 0);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormal);
-    ssaoShader.setInt("gNormal", 1);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.depthTex);
+    ssaoShader.setInt("depthTex", 1);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, noiseTex);
     ssaoShader.setInt("noiseTex", 2);
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // kernel
+    for (int i = 0; i < 64; i++)
+      ssaoShader.setVec3(("samples[" + std::to_string(i) + "]"), ssaoKernel[i]);
+    // draw quad
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // SSAO blur
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
     ssaoBlurShader.use();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, ssaoColor);
     ssaoBlurShader.setInt("ssaoInput", 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glClear(GL_COLOR_BUFFER_BIT);
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Lighting pass
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    deferredLightingShader.use();
-    deferredLightingShader.setVec3("viewPos", camera.Position);
+    // Lighting pass - use light volumes instead of fullscreen quad
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE); // Additive blending for multiple lights
+    glDepthMask(GL_FALSE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT); // Cull front faces to render back faces only
+
+    lightPassShader.use();
+    lightPassShader.setMat4("projection", projection);
+    lightPassShader.setMat4("view", view);
+    lightPassShader.setVec3("viewPos", camera.Position);
+
     // Bind GBuffer textures
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer.texPosition);
-    deferredLightingShader.setInt("gPosition", 0);
+    lightPassShader.setInt("gPosition", 0);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gbuffer.texNormal);
-    deferredLightingShader.setInt("gNormal", 1);
+    lightPassShader.setInt("gNormal", 1);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gbuffer.texAlbedoMetal);
-    deferredLightingShader.setInt("gAlbedoMetal", 2);
+    lightPassShader.setInt("gAlbedoMetal", 2);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, gbuffer.texRoughAoEmiss);
-    deferredLightingShader.setInt("gRoughAoEmiss", 3);
+    lightPassShader.setInt("gRoughAoEmiss", 3);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, ssaoColorBlur);
-    deferredLightingShader.setInt("ssaoTex", 4);
+    lightPassShader.setInt("ssaoTex", 4);
 
-    deferredLightingShader.setInt("uPointLightCount", (int)pointLights.size());
-    for (int i = 0; i < (int)pointLights.size(); ++i)
-    {
-      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].position", pointLights[i].pos);
-      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].color", pointLights[i].color);
-      deferredLightingShader.setFloat("uPointLights[" + std::to_string(i) + "].radius", pointLights[i].radius);
-    }
-
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    // Copy depth from GBuffer to default framebuffer
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer.fbo);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Draw light volumes (for visualization) - AFTER lighting pass, on main framebuffer
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // Don't write to depth buffer
-
-    lightVolumeShader.use();
-    lightVolumeShader.setMat4("projection", projection);
-    lightVolumeShader.setMat4("view", view);
-    lightVolumeShader.setFloat("alpha", 1.0f); // Add alpha uniform
-
+    // Render each light as a sphere
     for (auto &pl : pointLights)
     {
       glm::mat4 model = glm::mat4(1.0f);
       model = glm::translate(model, pl.pos);
       model = glm::scale(model, glm::vec3(pl.radius));
-      lightVolumeShader.setMat4("model", model);
-      lightVolumeShader.setVec3("lightColor", pl.color);
-      pl.lightVolume.Draw(lightVolumeShader);
+
+      lightPassShader.setMat4("model", model);
+      lightPassShader.setVec3("lightPos", pl.pos);
+      lightPassShader.setVec3("lightColor", pl.color);
+      lightPassShader.setFloat("lightRadius", pl.radius);
+
+      pl.lightVolume.Draw(lightPassShader);
     }
 
-    glDepthMask(GL_TRUE); // Re-enable depth writing
+    glCullFace(GL_BACK);
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 #else
     // Forward fallback (unchanged)
@@ -500,11 +500,288 @@ int main()
     myModel.Draw(modelShader);
 #endif
 
-    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, ssaoColor, ssaoColorBlur);
+    // In frame loop:
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
-    // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
-    // etc.)
-    // -------------------------------------------------------------------------------
+    // 1) Geometry pass -> GBuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.fbo);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    deferredGeometryShader.use();
+    deferredGeometryShader.setMat4("projection", projection);
+    deferredGeometryShader.setMat4("view", view);
+    deferredGeometryShader.setMat4("model", glm::mat4(1.0f));
+    deferredGeometryShader.setFloat("uTime", (float)glfwGetTime());
+    myModel.Draw(deferredGeometryShader);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 2) SSAO (writes to ssaoFBO)
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ssaoShader.use();
+    ssaoShader.setMat4("projection", projection);
+    ssaoShader.setMat4("invProjection", glm::inverse(projection));
+    ssaoShader.setMat4("invView", glm::inverse(view));
+    ssaoShader.setFloat("radius", 0.5f);
+    ssaoShader.setFloat("bias", 0.025f);
+    // bind inputs
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormalRough);
+    ssaoShader.setInt("gNormalRough", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.depthTex);
+    ssaoShader.setInt("depthTex", 1);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, noiseTex);
+    ssaoShader.setInt("noiseTex", 2);
+    // kernel
+    for (int i = 0; i < 64; i++)
+      ssaoShader.setVec3(("samples[" + std::to_string(i) + "]"), ssaoKernel[i]);
+    // draw quad
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 3) SSAO blur -> ssaoBlurFBO
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ssaoBlurShader.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, ssaoColor);
+    ssaoBlurShader.setInt("ssaoInput", 0);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 4) Lighting pass -> default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    deferredLightingShader.use();
+    deferredLightingShader.setVec3("viewPos", camera.Position);
+    deferredLightingShader.setInt("gPosition", 0);
+    deferredLightingShader.setInt("gNormalRough", 1);
+    deferredLightingShader.setInt("gAlbedoMetal", 2);
+    deferredLightingShader.setInt("gAoEmissSpec", 3);
+    deferredLightingShader.setInt("ssaoTex", 4);
+
+    // New: pass ambient/SSAO strength
+    deferredLightingShader.setFloat("uAmbient", gAmbient);
+    deferredLightingShader.setFloat("uSSAOStrength", gSSAOStrength);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texPosition);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormalRough);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texAlbedoMetal);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texAoEmissSpec);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBlur);
+
+    deferredLightingShader.setInt("uPointLightCount", (int)pointLights.size());
+    for (int i = 0; i < (int)pointLights.size(); ++i)
+    {
+      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].position", pointLights[i].pos);
+      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].color", pointLights[i].color);
+      deferredLightingShader.setFloat("uPointLights[" + std::to_string(i) + "].radius", pointLights[i].radius);
+    }
+    // draw quad
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    // 5) (Optional) visualize light spheres on default framebuffer
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    lightVolumeShader.use();
+    lightVolumeShader.setMat4("projection", projection);
+    lightVolumeShader.setMat4("view", view);
+    lightVolumeShader.setFloat("alpha", 0.2f);
+    for (auto &pl : pointLights)
+    {
+      glm::mat4 m(1.0f);
+      m = glm::translate(m, pl.pos);
+      m = glm::scale(m, glm::vec3(pl.radius));
+      lightVolumeShader.setMat4("model", m);
+      lightVolumeShader.setVec3("lightColor", pl.color);
+      pl.lightVolume.Draw(lightVolumeShader);
+    }
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+
+    // 6) ImGui after the scene (still on default framebuffer)
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // // Show a simple window that we create ourselves. We use a Begin/End pair
+    // to created a named window.
+    // {
+    //     ImGui::Begin("Boxes and Lighting"); // Create a window and append into
+    //     it.
+
+    //     ImGui::End();
+    // }
+
+    // GBuffer Debug Viewer
+    {
+      ImGui::Begin("GBuffer Debug Viewer");
+
+      static int selectedBuffer = 0;
+      const char *bufferNames[] = {"Position", "Normal", "Albedo+Metal", "Rough+AO+Emiss", "SSAO", "SSAO Blurred"};
+
+      ImGui::Combo("Buffer", &selectedBuffer, bufferNames, IM_ARRAYSIZE(bufferNames));
+
+      // Display the selected buffer
+      GLuint texID = 0;
+      switch (selectedBuffer)
+      {
+      case 0:
+        texID = gbuffer.texPosition;
+        break;
+      case 1:
+        texID = gbuffer.texNormalRough;
+        break;
+      case 2:
+        texID = gbuffer.texAlbedoMetal;
+        break;
+      case 3:
+        texID = gbuffer.texAoEmissSpec;
+        break;
+      case 4:
+        texID = ssaoColor;
+        break;
+      case 5:
+        texID = ssaoColorBlur;
+        break;
+      }
+
+      // Calculate display size (maintain aspect ratio)
+      float aspectRatio = (float)SCR_WIDTH / (float)SCR_HEIGHT;
+      float displayWidth = 512.0f;
+      float displayHeight = displayWidth / aspectRatio;
+
+      if (texID != 0)
+      {
+        ImGui::Image((void *)(intptr_t)texID, ImVec2(displayWidth, displayHeight),
+                     ImVec2(0, 1), ImVec2(1, 0)); // Flip V coordinate
+      }
+
+      // Show all buffers as thumbnails
+      ImGui::Separator();
+      ImGui::Text("All Buffers:");
+
+      float thumbSize = 128.0f;
+      float thumbHeight = thumbSize / aspectRatio;
+
+      ImGui::BeginGroup();
+      ImGui::Text("Position");
+      ImGui::Image((void *)(intptr_t)gbuffer.texPosition, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("Normal");
+      ImGui::Image((void *)(intptr_t)gbuffer.texNormal, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("Albedo+Metal");
+      ImGui::Image((void *)(intptr_t)gbuffer.texAlbedoMetal, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::BeginGroup();
+      ImGui::Text("Rough+AO+Emiss");
+      ImGui::Image((void *)(intptr_t)gbuffer.texRoughAoEmiss, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("SSAO");
+      ImGui::Image((void *)(intptr_t)ssaoColor, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("SSAO Blurred");
+      ImGui::Image((void *)(intptr_t)ssaoColorBlur, ImVec2(thumbSize, thumbHeight),
+                   ImVec2(0, 1), ImVec2(1, 0));
+      ImGui::EndGroup();
+
+      ImGui::End();
+    }
+
+    // Shader editor
+    {
+      ImGui::Begin("Shader Editor"); // Create a window and append into it.
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                  1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+      ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+      static Shader *gShader = nullptr;
+
+      if (ImGui::BeginTabBar("Shaders", tab_bar_flags))
+      {
+        for (const auto &[key, s] : Shader::shaders)
+        {
+          if (ImGui::BeginTabItem(s->name))
+          {
+            gShader = s;
+            ImGui::EndTabItem();
+          }
+        }
+
+        ImGui::EndTabBar();
+
+        if (gShader != nullptr)
+        {
+          static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
+          ImGui::Text("Vertex Shader");
+          ImGui::SameLine();
+          ImGui::Text("%s", gShader->vertexPath);
+          ImGui::InputTextMultiline(
+              "##VertexShader", gShader->vtext, IM_ARRAYSIZE(gShader->vtext),
+              ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+
+          ImGui::Text("Fragment Shader");
+          ImGui::SameLine();
+          ImGui::Text("%s", gShader->fragmentPath);
+          ImGui::InputTextMultiline(
+              "##FragmentShader", gShader->ftext, IM_ARRAYSIZE(gShader->ftext),
+              ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+
+          if (ImGui::Button("Recompile Shaders"))
+            gShader->reload();
+
+          ImGui::SameLine();
+
+          if (ImGui::Button("Save Shaders"))
+            gShader->saveShaders();
+        }
+      }
+      ImGui::ColorEdit3(
+          "clear color",
+          (float *)&clear_color); // Edit 3 floats representing a color
+      ImGui::Separator();
+      ImGui::Text("Lighting Controls");
+      ImGui::SliderFloat("Ambient", &gAmbient, 0.0f, 0.3f);
+      ImGui::SliderFloat("SSAO Strength", &gSSAOStrength, 0.0f, 1.5f);
+      ImGui::End();
+    }
+
+    // Rendering
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // Swap
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
@@ -955,13 +1232,13 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
       texID = gbuffer.texPosition;
       break;
     case 1:
-      texID = gbuffer.texNormal;
+      texID = gbuffer.texNormalRough;
       break;
     case 2:
       texID = gbuffer.texAlbedoMetal;
       break;
     case 3:
-      texID = gbuffer.texRoughAoEmiss;
+      texID = gbuffer.texAoEmissSpec;
       break;
     case 4:
       texID = ssaoColor;
@@ -1083,145 +1360,18 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
     ImGui::ColorEdit3(
         "clear color",
         (float *)&clear_color); // Edit 3 floats representing a color
+    ImGui::Separator();
+    ImGui::Text("Lighting Controls");
+    ImGui::SliderFloat("Ambient", &gAmbient, 0.0f, 0.3f);
+    ImGui::SliderFloat("SSAO Strength", &gSSAOStrength, 0.0f, 1.5f);
     ImGui::End();
   }
 
   // Rendering
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+  // Swap
+  glfwSwapBuffers(window);
+  glfwPollEvents();
 }
-
-// void drawIMGUI(Renderer *myRenderer, iCubeModel *cubeSystem,
-//                SceneGraph *sg, std::map<std::string, unsigned int> texMap,
-//                treeNode *nodes[])
-// {
-//     // Start the Dear ImGui frame
-//     ImGui_ImplOpenGL3_NewFrame();
-//     ImGui_ImplGlfw_NewFrame();
-//     ImGui::NewFrame();
-
-//     // Show a simple window that we create ourselves. We use a Begin/End pair
-//     to created a named window.
-//     {
-//         ImGui::Begin("Hello, world!"); // Create a window and append into it.
-
-//         ImGui::Text("This is some useful text.");                      //
-//         Display some text (you can use a format strings too)
-//         ImGui::Checkbox("Demo Window", &myRenderer->show_demo_window); //
-//         Edit bools storing our window open/close state
-//         ImGui::Checkbox("Another Window", &myRenderer->show_another_window);
-
-//         ImGui::SliderFloat("float", &myRenderer->f, 0.0f, 1.0f); // Edit 1
-//         float using a slider from 0.0f to 1.0f ImGui::ColorEdit3("clear
-//         color", (float *)&myRenderer->clear_color); // Edit 3 floats
-//         representing a color
-
-//         if (ImGui::Button("Button")) // Buttons return true when clicked
-//         (most widgets return true when edited/activated)
-//             myRenderer->counter++;
-//         ImGui::SameLine();
-//         ImGui::Text("counter = %d", myRenderer->counter);
-
-//         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f /
-//         ImGui::GetIO().Framerate, ImGui::GetIO().Framerate); ImGui::End();
-//     }
-
-//     if (myRenderer->show_another_window)
-//     {
-//         ImGui::Begin("Another Window", &myRenderer->show_another_window); //
-//         Pass a pointer to our bool variable (the window will have a closing
-//         button that will clear the bool when clicked) ImGui::Text("Hello from
-//         another window!"); if (ImGui::Button("Close Me"))
-//             myRenderer->show_another_window = false;
-//         ImGui::End();
-//     }
-
-//     if (myRenderer->show_demo_window)
-//         ImGui::ShowDemoWindow(&myRenderer->show_demo_window);
-
-//     ShaderEditor(sg);
-
-//     // Rendering
-//     ImGui::Render();
-//     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-// }
-
-// void ShaderEditor(SceneGraph *sg)
-// {
-//     // Show a simple window that we create ourselves. We use a Begin/End pair
-//     to created a named window.
-//     {
-//         ImGui::Begin("Shader Editor"); // Create a window and append into it.
-
-//         ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-
-//         Shader *gShader = Shader::shaders["base"];
-
-//         if (ImGui::BeginTabBar("Shaders", tab_bar_flags))
-//         {
-//             for (const auto &[key, s] : Shader::shaders)
-//             {
-//                 if (ImGui::BeginTabItem(s->name))
-//                 {
-//                     gShader = s;
-//                     ImGui::EndTabItem();
-//                 }
-//             }
-
-//             ImGui::EndTabBar();
-
-//             {
-//                 static ImGuiInputTextFlags flags =
-//                 ImGuiInputTextFlags_AllowTabInput; ImGui::Text("Vertex
-//                 Shader"); ImGui::SameLine(); ImGui::Text("%s",
-//                 std::filesystem::absolute(gShader->vertexPath).u8string().c_str());
-//                 ImGui::InputTextMultiline("Vertex Shader", gShader->vtext,
-//                 IM_ARRAYSIZE(gShader->vtext), ImVec2(-FLT_MIN,
-//                 ImGui::GetTextLineHeight() * 16), flags);
-
-//                 ImGui::Text("Fragment Shader");
-//                 ImGui::SameLine();
-//                 ImGui::Text("%s",
-//                 std::filesystem::absolute(gShader->fragmentPath).u8string().c_str());
-//                 ImGui::InputTextMultiline("Fragment Shader", gShader->ftext,
-//                 IM_ARRAYSIZE(gShader->ftext), ImVec2(-FLT_MIN,
-//                 ImGui::GetTextLineHeight() * 16), flags);
-
-//                 if (ImGui::Button("reCompile Shaders"))
-//                     gShader->reload();
-
-//                 ImGui::SameLine();
-
-//                 if (ImGui::Button("Save Shaders"))
-//                     gShader->saveShaders();
-//             }
-//         }
-
-//         if (Material::materials["checkers"] != NULL)
-//         {
-//             for (int i = 0; i < 2; i++)
-//             {
-//                 ImGui::PushID(i);
-
-//                 if (ImGui::ImageButton((void *)(intptr_t)texture[i],
-//                 ImVec2(64, 64)))
-//                     Material::materials["checkers"]->textures[0] =
-//                     texture[i];
-//                 ImGui::PopID();
-//                 ImGui::SameLine();
-//             }
-//         }
-
-//         ImGui::NewLine();
-
-//         if (Material::materials["checkers"] != NULL)
-//             ImGui::SliderFloat("shine5",
-//             &Material::materials["checkers"]->shine, 0.0, 1.0);
-
-//         if (Material::materials["shuttle"] != NULL)
-//             ImGui::SliderFloat("shine6",
-//             &Material::materials["shuttle"]->shine, 0.0, 1.0);
-
-//         ImGui::End();
-//     }
-// }

@@ -15,12 +15,11 @@ private:
   // clang-format off
   std::vector<Vertex> generateVertices(float width, float height)
   {
-    return {
-      {{-width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{ width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{ width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{-width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-    };
+    Vertex v0{{-width/2,0.f,-height/2},{0.f,1.f,0.f},{0.f,0.f},{0.f,0.f,0.f},{0.f,0.f,0.f},{-1,-1,-1,-1},{0.f,0.f,0.f,0.f}};
+    Vertex v1{{ width/2,0.f,-height/2},{0.f,1.f,0.f},{1.f,0.f},{0.f,0.f,0.f},{0.f,0.f,0.f},{-1,-1,-1,-1},{0.f,0.f,0.f,0.f}};
+    Vertex v2{{ width/2,0.f, height/2},{0.f,1.f,0.f},{1.f,1.f},{0.f,0.f,0.f},{0.f,0.f,0.f},{-1,-1,-1,-1},{0.f,0.f,0.f,0.f}};
+    Vertex v3{{-width/2,0.f, height/2},{0.f,1.f,0.f},{0.f,1.f},{0.f,0.f,0.f},{0.f,0.f,0.f},{-1,-1,-1,-1},{0.f,0.f,0.f,0.f}};
+    return { v0, v1, v2, v3 };
   }
 
   std::vector<unsigned int> generateIndices()
@@ -45,18 +44,18 @@ private:
   // clang-format off
   std::vector<Vertex> generateVertices(float length, float width, float height)
   {
+    auto makeV = [](glm::vec3 p, glm::vec3 n, glm::vec2 uv){
+      return Vertex{p,n,uv,glm::vec3(0),glm::vec3(0),{-1,-1,-1,-1},{0.f,0.f,0.f,0.f}};
+    };
     return {
-      // Bottom face
-      {{-length / 2, 0.0f, -width / 2}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{ length / 2, 0.0f, -width / 2}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{ length / 2, 0.0f,  width / 2}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{-length / 2, 0.0f,  width / 2}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
-
-      // Top face
-      {{-length / 2, height, -width / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{ length / 2, height, -width / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{ length / 2, height,  width / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{-length / 2, height,  width / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+      makeV({-length/2,0.f,-width/2},{0.f,-1.f,0.f},{0.f,0.f}),
+      makeV({ length/2,0.f,-width/2},{0.f,-1.f,0.f},{1.f,0.f}),
+      makeV({ length/2,0.f, width/2},{0.f,-1.f,0.f},{1.f,1.f}),
+      makeV({-length/2,0.f, width/2},{0.f,-1.f,0.f},{0.f,1.f}),
+      makeV({-length/2,height,-width/2},{0.f,1.f,0.f},{0.f,0.f}),
+      makeV({ length/2,height,-width/2},{0.f,1.f,0.f},{1.f,0.f}),
+      makeV({ length/2,height, width/2},{0.f,1.f,0.f},{1.f,1.f}),
+      makeV({-length/2,height, width/2},{0.f,1.f,0.f},{0.f,1.f}),
     };
   }
 
@@ -105,21 +104,18 @@ private:
     std::vector<Vertex> vertices;
     for (unsigned int i = 0; i <= stackCount; ++i)
     {
-      float stackAngle = glm::pi<float>() / 2 - i * glm::pi<float>() / stackCount; // from pi/2 to -pi/2
-      float xy = radius * cosf(stackAngle);                                        // r * cos(u)
-      float z = radius * sinf(stackAngle);                                         // r * sin(u)
+      float stackAngle = glm::pi<float>() / 2 - i * glm::pi<float>() / stackCount;
+      float xy = radius * cosf(stackAngle);
+      float z = radius * sinf(stackAngle);
       for (unsigned int j = 0; j <= sectorCount; ++j)
       {
-        float sectorAngle = j * 2 * glm::pi<float>() / sectorCount; // from 0 to 2pi
-
-        float x = xy * cosf(sectorAngle); // r * cos(u) * cos(v)
-        float y = xy * sinf(sectorAngle); // r * cos(u) * sin(v)
-
-        glm::vec3 position = glm::vec3(x, y, z);
+        float sectorAngle = j * 2 * glm::pi<float>() / sectorCount;
+        float x = xy * cosf(sectorAngle);
+        float y = xy * sinf(sectorAngle);
+        glm::vec3 position(x, y, z);
         glm::vec3 normal = glm::normalize(position);
-        glm::vec2 texCoords = glm::vec2((float)j / sectorCount, (float)i / stackCount);
-
-        vertices.push_back({position, normal, texCoords});
+        glm::vec2 texCoords((float)j / sectorCount, (float)i / stackCount);
+        vertices.push_back(Vertex{position, normal, texCoords, glm::vec3(0), glm::vec3(0), {-1, -1, -1, -1}, {0.f, 0.f, 0.f, 0.f}});
       }
     }
     return vertices;

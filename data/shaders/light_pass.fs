@@ -1,20 +1,37 @@
 #version 330 core
 out vec4 FragColor;
 
-in vec3 FragPos;
-
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform float lightRadius;
 uniform vec3 viewPos;
+uniform mat4 invProjection;
+uniform mat4 invView;
 
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
+uniform sampler2D gNormalRough;
 uniform sampler2D gAlbedoMetal;
-uniform sampler2D gRoughAoEmiss;
+uniform sampler2D gAoEmissSpec;
+uniform sampler2D depthTex;
 uniform sampler2D ssaoTex;
 
 const float PI = 3.14159265359;
+
+// Decode octahedral normal
+vec3 decodeNormal(vec2 enc) {
+    vec3 n;
+    n.z = 1.0 - abs(enc.x) - abs(enc.y);
+    n.xy = n.z >= 0.0 ? enc.xy : (1.0 - abs(enc.yx)) * sign(enc.xy);
+    return normalize(n);
+}
+
+// Reconstruct world position from depth
+vec3 reconstructPosition(vec2 texCoord, float depth) {
+    vec4 clipSpace = vec4(texCoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 viewSpace = invProjection * clipSpace;
+    viewSpace /= viewSpace.w;
+    vec4 worldSpace = invView * viewSpace;
+    return worldSpace.xyz;
+}
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0){
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
@@ -42,19 +59,26 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float rough){
 }
 
 void main(){
-    vec2 texCoord = gl_FragCoord.xy / vec2(1280, 720); // Use screen resolution
+    vec2 texCoord = gl_FragCoord.xy / vec2(1280, 720);
     
-    vec3 pos = texture(gPosition, texCoord).xyz;
-    vec3 N = normalize(texture(gNormal, texCoord).xyz);
+    // Read packed data
+    vec4 normalRough = texture(gNormalRough, texCoord);
     vec4 albedoMetal = texture(gAlbedoMetal, texCoord);
-    vec4 pack = texture(gRoughAoEmiss, texCoord);
+    vec4 aoEmissSpec = texture(gAoEmissSpec, texCoord);
+    float depth = texture(depthTex, texCoord).r;
     
+    // Early discard for skybox
+    if (depth >= 0.9999) discard;
+    
+    // Decode data
+    vec3 N = decodeNormal(normalRough.xy);
+    float roughness = normalRough.z;
+    float metallic = normalRough.w;
     vec3 albedo = pow(albedoMetal.rgb, vec3(2.2));
-    float metallic = albedoMetal.a;
-    float roughness = texture(gNormal, texCoord).w;
-    float ao = pack.r * texture(ssaoTex, texCoord).r;
-    float specScalar = pack.a;
+    float ao = aoEmissSpec.r * texture(ssaoTex, texCoord).r;
+    float specScalar = aoEmissSpec.a;
     
+    vec3 pos = reconstructPosition(texCoord, depth);
     vec3 V = normalize(viewPos - pos);
     vec3 F0 = mix(vec3(0.04*specScalar), albedo, metallic);
     
