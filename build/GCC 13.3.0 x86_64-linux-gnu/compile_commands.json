@@ -1,0 +1,62 @@
+[
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/src/main.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/src/main.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/src/main.cpp",
+  "output": "CMakeFiles/Project1.dir/src/main.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/src/stb_image.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/src/stb_image.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/src/stb_image.cpp",
+  "output": "CMakeFiles/Project1.dir/src/stb_image.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/gcc -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/glad/src/glad.c.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/src/glad.c",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/src/glad.c",
+  "output": "CMakeFiles/Project1.dir/include/glad/src/glad.c.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/imgui.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/imgui.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/imgui_demo.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_demo.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_demo.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/imgui_demo.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/imgui_draw.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_draw.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_draw.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/imgui_draw.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/imgui_tables.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_tables.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_tables.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/imgui_tables.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/imgui_widgets.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_widgets.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui_widgets.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/imgui_widgets.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/backends/imgui_impl_glfw.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends/imgui_impl_glfw.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends/imgui_impl_glfw.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/backends/imgui_impl_glfw.cpp.o"
+},
+{
+  "directory": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu",
+  "command": "/usr/bin/g++ -DDATA_DIR=\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/data\\\" -DGLFW_INCLUDE_NONE -DIMGUI_IMPL_OPENGL_LOADER_GLAD -DRUNTIME_DATA_DIR=\"\\\"/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/build/GCC 13.3.0 x86_64-linux-gnu/data\\\"\" -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/glad/include -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui -I/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles/Project1.dir/include/imgui/backends/imgui_impl_opengl3.cpp.o -c /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends/imgui_impl_opengl3.cpp",
+  "file": "/mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends/imgui_impl_opengl3.cpp",
+  "output": "CMakeFiles/Project1.dir/include/imgui/backends/imgui_impl_opengl3.cpp.o"
+}
+]
