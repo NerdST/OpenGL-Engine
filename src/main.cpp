@@ -47,6 +47,8 @@ ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 // settings
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
+// const unsigned int SCR_WIDTH = 1920;
+// const unsigned int SCR_HEIGHT = 1080;
 
 // camera
 Camera camera(glm::vec3(5.0f, 1.0f, 5.0f));
