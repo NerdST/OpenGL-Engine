@@ -454,6 +454,7 @@ CMakeFiles/Project1.dir/src/main.cpp.o: \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/texture.h \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/shader.h \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/primitives.h \
+ /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/buffers.h \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/backends/imgui_impl_glfw.h \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imgui.h \
  /mnt/shared/sangeeth/Documents/RPI/Semester7/GSAS-4530/Projects/FinalProject/include/imgui/imconfig.h \
@@ -463,4 +464,4 @@ CMakeFiles/Project1.dir/src/main.cpp.o: \
  /usr/include/c++/13/bits/random.tcc /usr/include/c++/13/numeric \
  /usr/include/c++/13/bits/stl_numeric.h \
  /usr/include/c++/13/pstl/glue_numeric_defs.h /usr/include/c++/13/array \
- /usr/include/c++/13/compare
+ /usr/include/c++/13/compare /usr/include/c++/13/math.h
