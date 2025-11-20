@@ -23,7 +23,8 @@
 #include <array>
 #include <map>
 #include <string>
-#define USE_DEFERRED
+
+#define DEBUG_MODE
 
 // Initialize static member
 std::map<std::string, Shader *> Shader::shaders;
@@ -39,8 +40,7 @@ void processInput(GLFWwindow *window);
 //                treeNode *nodes[]);
 // void ShaderEditor(SceneGraph *sg);
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer, unsigned int ssaoColor,
-               unsigned int ssaoColorBlur);
+               float &lastFrame, GBuffer &gbuffer);
 unsigned int loadTexture(char const *path);
 ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 
@@ -154,6 +154,8 @@ int main()
   // myModel.setDefaultTexture("data/models/cow/textures/Textured_mesh_1_0.jpeg");
   myModel.setDefaultTexture(std::string(RUNTIME_DATA_DIR) + "/models/cow/textures/Textured_mesh_1_0.jpeg");
 
+  // PBR Plane Model
+
   // std::cout << "Model loaded with " << myModel.meshes.size() << " meshes"
   //           << std::endl;
   // for (size_t i = 0; i < myModel.meshes.size(); i++)
@@ -164,31 +166,34 @@ int main()
   // }
 
   GBuffer gbuffer;
-#ifdef USE_DEFERRED
   if (!gbuffer.init(SCR_WIDTH, SCR_HEIGHT))
   {
     std::cout << "GBuffer init failed\n";
   }
   // Shader deferredGeometryShader("data/shaders/deferred.vs", "data/shaders/deferred.fs", "deferredGeometryShader");
   Shader deferredGeometryShader(
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred.vs").c_str(),
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred.fs").c_str(),
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred_geometry.vs").c_str(),
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred_geometry.fs").c_str(),
       "deferredGeometryShader");
   // Shader deferredLightingShader("data/shaders/fullscreen_quad.vs", "data/shaders/deferred_lighting.fs", "deferredLightingShader");
   Shader deferredLightingShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
       (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred_lighting.fs").c_str(),
       "deferredLightingShader");
-  // Shader ssaoShader("data/shaders/fullscreen_quad.vs", "data/shaders/ssao.fs", "ssaoShader");
-  Shader ssaoShader(
+  Shader HDRShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/ssao.fs").c_str(),
-      "ssaoShader");
-  // Shader ssaoBlurShader("data/shaders/fullscreen_quad.vs", "data/shaders/ssao_blur.fs", "ssaoBlurShader");
-  Shader ssaoBlurShader(
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/hdr.fs").c_str(),
+      "HDRShader");
+
+#ifdef DEBUG_MODE
+  Shader debugNormalShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/ssao_blur.fs").c_str(),
-      "ssaoBlurShader");
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/debug/normal_DEBUG.fs").c_str(),
+      "debugNormalShader");
+  Shader debugDepthShader(
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/debug/depth_DEBUG.fs").c_str(),
+      "debugDepthShader");
 #endif
 
   // Fullscreen quad
@@ -214,72 +219,11 @@ int main()
     glBindVertexArray(0);
   }
 
-  // SSAO FBOs
-  unsigned int ssaoFBO = 0, ssaoBlurFBO = 0;
-  unsigned int ssaoColor = 0, ssaoColorBlur = 0;
-#ifdef USE_DEFERRED
-  glGenFramebuffers(1, &ssaoFBO);
-  glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-  glGenTextures(1, &ssaoColor);
-  glBindTexture(GL_TEXTURE_2D, ssaoColor);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, SCR_WIDTH, SCR_HEIGHT, 0, GL_RED, GL_FLOAT, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColor, 0);
-
-  glGenFramebuffers(1, &ssaoBlurFBO);
-  glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-  glGenTextures(1, &ssaoColorBlur);
-  glBindTexture(GL_TEXTURE_2D, ssaoColorBlur);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, SCR_WIDTH, SCR_HEIGHT, 0, GL_RED, GL_FLOAT, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBlur, 0);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-#endif
-
-  // SSAO kernel + noise
-  std::array<glm::vec3, 64> ssaoKernel;
-  std::vector<glm::vec3> ssaoNoise;
-#ifdef USE_DEFERRED
-  {
-    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    std::default_random_engine rng;
-    for (int i = 0; i < 64; i++)
-    {
-      glm::vec3 s(
-          dist(rng) * 2.0f - 1.0f,
-          dist(rng) * 2.0f - 1.0f,
-          dist(rng));
-      s = glm::normalize(s);
-      float scale = float(i) / 64.0f;
-      scale = glm::mix(0.1f, 1.0f, scale * scale);
-      ssaoKernel[i] = s * scale;
-    }
-    for (int i = 0; i < 16; i++)
-    {
-      ssaoNoise.emplace_back(
-          dist(rng) * 2.0f - 1.0f,
-          dist(rng) * 2.0f - 1.0f,
-          0.0f);
-    }
-  }
-  unsigned int noiseTex = 0;
-  {
-    glGenTextures(1, &noiseTex);
-    glBindTexture(GL_TEXTURE_2D, noiseTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssaoNoise.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  }
-#endif
-
   struct PointLight
   {
     glm::vec3 pos;
     glm::vec3 color;
+    float intensity;
     float radius;
     Sphere lightVolume;
   };
@@ -287,8 +231,9 @@ int main()
   //     {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 6.f, RectangularPrism{{1.f, 1.f, 1.f}, {2.f, 2.f, 2.f}}},
   //     {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 5.f, RectangularPrism{{-4.f, 0.5f, -3.f}, {-2.f, 2.f, -1.f}}}};
   std::vector<PointLight> pointLights = {
-      {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 6.f, Sphere(0.02f, 36, 18, {})},
-      {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 5.f, Sphere(0.02f, 36, 18, {})}};
+      {{2.f, 2.f, 2.f}, {0.f, 0.95f, 0.0f}, 10.f, 10.f, Sphere(0.02f, 36, 18, {})},
+      {{-3.f, 1.5f, -2.f}, {1.0f, 0.0f, 0.f}, 6.f, 8.f, Sphere(0.02f, 36, 18, {})}};
+  // std::vector<PointLight> pointLights;
 
   Shader lightVolumeShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/lights.vs").c_str(),
@@ -311,44 +256,11 @@ int main()
 
     // render
     // ------
-    //     glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // // be sure to activate shader when setting uniforms/drawing objects
-    // wallShader.use();
-
-    // // view/projection transformations
-    // glm::mat4 projection =
-    //     glm::perspective(glm::radians(camera.Zoom),
-    //                      (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    // glm::mat4 view = camera.GetViewMatrix();
-    // wallShader.setMat4("projection", projection);
-    // wallShader.setMat4("view", view);
-
-    // // world transformation
-    // glm::mat4 model = glm::mat4(1.0f);
-    // wallShader.setMat4("model", model);
-
-    // wallShader.setVec3("viewPos", camera.Position);
-    // wallShader.setVec3("spotLight.position", camera.Position);
-    // wallShader.setVec3("spotLight.direction", camera.Front);
-    // wallShader.setVec3("spotLight.ambient", 0.5f, 0.5f, 0.5f);
-    // wallShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-    // wallShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-    // wallShader.setFloat("spotLight.constant", 1.0f);
-    // wallShader.setFloat("spotLight.linear", 0.09f);
-    // wallShader.setFloat("spotLight.quadratic", 0.032f);
-    // wallShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-    // wallShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
-
-    // wallShader.setFloat("material.shininess", 32.0f);
-
-    // // Bind wall texture
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
                                             (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
 
-#ifdef USE_DEFERRED
     // Geometry pass
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.fbo);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -357,45 +269,34 @@ int main()
     deferredGeometryShader.setMat4("view", view);
     glm::mat4 modelMat(1.0f);
     deferredGeometryShader.setMat4("model", modelMat);
-    deferredGeometryShader.setFloat("uTime", currentFrame);
     myModel.Draw(deferredGeometryShader);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // SSAO pass
-    ssaoShader.use();
-    ssaoShader.setMat4("projection", projection);
-    ssaoShader.setFloat("radius", 0.5f);
-    ssaoShader.setFloat("bias", 0.025f);
-    for (int i = 0; i < 64; i++)
-      ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texPosition);
-    ssaoShader.setInt("gPosition", 0);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormal);
-    ssaoShader.setInt("gNormal", 1);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, noiseTex);
-    ssaoShader.setInt("noiseTex", 2);
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // SSAO blur
-    ssaoBlurShader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, ssaoColor);
-    ssaoBlurShader.setInt("ssaoInput", 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     // Lighting pass
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+    /* Inputs:
+#version 330 core
+out vec4 FragColor;
+in vec2 TexCoords;
+in vec3 WorldPos;
+in vec3 Normal;
+
+struct PointLight {
+    vec3 position;
+    vec3 color;
+    float intensity;
+    float radius;
+};
+
+uniform int uPointLightCount;
+uniform PointLight uPointLights[32];
+uniform vec3 viewPos;
+
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gAlbedoMetal;
+uniform sampler2D gRoughAoEmiss;
+    */
+    // glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     deferredLightingShader.use();
     deferredLightingShader.setVec3("viewPos", camera.Position);
@@ -407,22 +308,29 @@ int main()
     glBindTexture(GL_TEXTURE_2D, gbuffer.texNormal);
     deferredLightingShader.setInt("gNormal", 1);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texAlbedoMetal);
-    deferredLightingShader.setInt("gAlbedoMetal", 2);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texAlbedoSpec);
+    deferredLightingShader.setInt("gAlbedoSpec", 2);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.texRoughAoEmiss);
-    deferredLightingShader.setInt("gRoughAoEmiss", 3);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texMatProps);
+    deferredLightingShader.setInt("gMatProps", 3);
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, ssaoColorBlur);
-    deferredLightingShader.setInt("ssaoTex", 4);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texEmissive);
+    deferredLightingShader.setInt("gEmissive", 4);
 
     deferredLightingShader.setInt("uPointLightCount", (int)pointLights.size());
-    for (int i = 0; i < (int)pointLights.size(); ++i)
+    for (size_t i = 0; i < pointLights.size(); i++)
     {
-      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].position", pointLights[i].pos);
-      deferredLightingShader.setVec3("uPointLights[" + std::to_string(i) + "].color", pointLights[i].color);
-      deferredLightingShader.setFloat("uPointLights[" + std::to_string(i) + "].radius", pointLights[i].radius);
+      std::string baseName = "uPointLights[" + std::to_string(i) + "]";
+      deferredLightingShader.setVec3(baseName + ".position", pointLights[i].pos);
+      deferredLightingShader.setVec3(baseName + ".color", pointLights[i].color);
+      deferredLightingShader.setFloat(baseName + ".intensity", pointLights[i].intensity);
+      deferredLightingShader.setFloat(baseName + ".radius", pointLights[i].radius);
     }
+
+    // Lighting pass -> HDR FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.HDRfbo);
+    glClear(GL_COLOR_BUFFER_BIT);
+    deferredLightingShader.use();
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -431,7 +339,48 @@ int main()
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer.fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Tonemap
+    HDRShader.use();
+    HDRShader.setBool("hdr", true);
+    HDRShader.setFloat("exposure", 0.1f);
+    HDRShader.setInt("hdrBuffer", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.bufHDR);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glEnable(GL_DEPTH_TEST);
+
+#ifdef DEBUG_MODE
+    // Debug: render debug visualizations into the debug FBOd
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.DEBUGfbo);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Enable both attachments for writing
+    GLenum debugBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, debugBuffers);
+
+    // Render normal debug visualization (writes to attachment 0)
+    debugNormalShader.use();
+    debugNormalShader.setInt("gNormal", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texNormal);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    // Render depth debug visualization
+    debugDepthShader.use();
+    debugDepthShader.setInt("gPosition", 0);
+    debugDepthShader.setFloat("nearPlane", 0.1f);
+    debugDepthShader.setFloat("farPlane", 100.0f);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.texPosition);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#endif
 
     // Draw light volumes (for visualization) - AFTER lighting pass, on main framebuffer
     glEnable(GL_BLEND);
@@ -455,52 +404,8 @@ int main()
 
     glDepthMask(GL_TRUE); // Re-enable depth writing
     glDisable(GL_BLEND);
-#else
-    // Forward fallback (unchanged)
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    modelShader.use();
-    modelShader.setMat4("projection", projection);
-    modelShader.setMat4("view", view);
-    modelShader.setMat4("model", glm::mat4(1.0f));
 
-    //     // Add lighting uniforms for the model (same as wallShader)
-    //     modelShader.setVec3("viewPos", camera.Position);
-    //     modelShader.setVec3("spotLight.position", camera.Position);
-    //     modelShader.setVec3("spotLight.direction", camera.Front);
-    //     modelShader.setVec3("spotLight.ambient", 0.2f, 0.2f, 0.2f);
-    //     modelShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-    //     modelShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-    //     modelShader.setFloat("spotLight.constant", 1.0f);
-    //     modelShader.setFloat("spotLight.linear", 0.09f);
-    //     modelShader.setFloat("spotLight.quadratic", 0.032f);
-    //     modelShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-    //     modelShader.setFloat("spotLight.outerCutOff",
-    //                          glm::cos(glm::radians(15.0f)));
-
-    //     // ADD THIS LINE - missing material shininess:
-    //     modelShader.setFloat("material.shininess", 32.0f);
-
-    //     model = glm::mat4(1.0f);
-    //     model = glm::translate(model, glm::vec3(0.0f, 1.75f, 0.0f));
-    //     // model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
-    //     modelShader.setMat4("model", model);
-    // #ifdef USE_DEFERRED
-    //     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.fbo);
-    //     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //     // geometry pass
-    //     deferredGeometryShader.use();
-    //     // set matrices, bind PBR textures for each mesh (fallbacks if missing)
-    //     myModel.Draw(deferredGeometryShader);
-    //     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    //     // SSAO pass then blur (bind gbuffer texPosition/texNormal)
-    //     // light pass: bind gbuffer textures + ssao result, draw fullscreen quad
-    // #else
-
-    myModel.Draw(modelShader);
-#endif
-
-    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, ssaoColor, ssaoColorBlur);
+    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer);
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
@@ -508,268 +413,6 @@ int main()
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
-
-  // // build and compile our shader zprogram
-  // // ------------------------------------
-  // // Shader ourShader("data/shaders/basicCube.vs",
-  // "data/shaders/basicCube.fs"); Shader
-  // lightingShader("data/shaders/ADSSurface.vs", "data/shaders/ADSSurface.fs",
-  // "lighting"); Shader lightCubeShader("data/shaders/glowingSurface.vs",
-  // "data/shaders/glowingSurface.fs", "lightCube");
-
-  // // set up vertex data (and buffer(s)) and configure vertex attributes
-  // // ------------------------------------------------------------------
-  // float vertices[] = {
-  //     // positions          // normals           // texture coords
-  //     -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-  //     0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
-  //     0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-  //     0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-  //     -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
-  //     -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-
-  //     -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-  //     0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-  //     0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-  //     0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-  //     -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-  //     -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-  //     -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-  //     -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-  //     -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-  //     -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-  //     -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-  //     -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-  //     0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-  //     0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-  //     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-  //     0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-  //     0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-  //     0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-  //     -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-  //     0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
-  //     0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-  //     0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-  //     -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-  //     -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-
-  //     -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-  //     0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-  //     0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-  //     0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-  //     -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-  //     -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
-  // // positions all containers
-  // glm::vec3 cubePositions[] = {
-  //     glm::vec3(0.0f, 0.0f, 0.0f),
-  //     glm::vec3(2.0f, 5.0f, -15.0f),
-  //     glm::vec3(-1.5f, -2.2f, -2.5f),
-  //     glm::vec3(-3.8f, -2.0f, -12.3f),
-  //     glm::vec3(2.4f, -0.4f, -3.5f),
-  //     glm::vec3(-1.7f, 3.0f, -7.5f),
-  //     glm::vec3(1.3f, -2.0f, -2.5f),
-  //     glm::vec3(1.5f, 2.0f, -2.5f),
-  //     glm::vec3(1.5f, 0.2f, -1.5f),
-  //     glm::vec3(-1.3f, 1.0f, -1.5f)};
-  // // positions of the point lights
-  // glm::vec3 pointLightPositions[] = {
-  //     glm::vec3(0.7f, 0.2f, 2.0f),
-  //     glm::vec3(2.3f, -3.3f, -4.0f),
-  //     glm::vec3(-4.0f, 2.0f, -12.0f),
-  //     glm::vec3(0.0f, 0.0f, -3.0f)};
-  // // first, configure the cube's VAO (and VBO)
-  // unsigned int VBO, cubeVAO;
-  // glGenVertexArrays(1, &cubeVAO); // create VAO for cube
-  // glGenBuffers(1, &VBO);          // create VBO
-
-  // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  // glBindVertexArray(cubeVAO);
-  // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void
-  // *)0); glEnableVertexAttribArray(0); glVertexAttribPointer(1, 3, GL_FLOAT,
-  // GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
-  // glEnableVertexAttribArray(1);
-  // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void
-  // *)(6 * sizeof(float))); glEnableVertexAttribArray(2);
-
-  // // second, configure the light's VAO (VBO stays the same; the vertices are
-  // the same for the light object which is also a 3D cube) unsigned int
-  // lightCubeVAO; glGenVertexArrays(1, &lightCubeVAO);
-  // glBindVertexArray(lightCubeVAO);
-
-  // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  // // note that we update the lamp's position attribute's stride to reflect
-  // the updated buffer data glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 *
-  // sizeof(float), (void *)0); glEnableVertexAttribArray(0);
-
-  // // load textures (we now use a utility function to keep the code more
-  // organized)
-  // //
-  // -----------------------------------------------------------------------------
-  // unsigned int diffuseMap = loadTexture("data/textures/container.png");
-  // unsigned int specularMap =
-  // loadTexture("data/textures/container_specular.png");
-
-  // // shader configuration
-  // // --------------------
-  // lightingShader.use();
-  // lightingShader.setInt("material.diffuse", 0);
-  // lightingShader.setInt("material.specular", 1);
-
-  // // render loop
-  // // -----------
-  // while (!glfwWindowShouldClose(window))
-  // {
-  //     // per-frame time logic
-  //     // --------------------
-  //     float currentFrame = static_cast<float>(glfwGetTime());
-  //     deltaTime = currentFrame - lastFrame;
-  //     lastFrame = currentFrame;
-
-  //     // input
-  //     // -----
-  //     processInput(window);
-
-  //     // render
-  //     // ------
-  //     glClearColor(clear_color.x, clear_color.y, clear_color.z,
-  //     clear_color.w); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-  //     // be sure to activate shader when setting uniforms/drawing objects
-  //     lightingShader.use();
-  //     lightingShader.setVec3("viewPos", camera.Position);
-  //     lightingShader.setFloat("material.shininess", 32.0f);
-
-  //     /*
-  //        Here we set all the uniforms for the 5/6 types of lights we have. We
-  //        have to set them manually and index the proper PointLight struct in
-  //        the array to set each uniform variable. This can be done more
-  //        code-friendly by defining light types as classes and set their
-  //        values in there, or by using a more efficient uniform approach by
-  //        using 'Uniform buffer objects', but that is something we'll discuss
-  //        in the 'Advanced GLSL' tutorial.
-  //     */
-  //     // directional light
-  //     lightingShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-  //     lightingShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-  //     lightingShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-  //     lightingShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-  //     // point light 1
-  //     lightingShader.setVec3("pointLights[0].position",
-  //     pointLightPositions[0]);
-  //     lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-  //     lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-  //     lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setFloat("pointLights[0].constant", 1.0f);
-  //     lightingShader.setFloat("pointLights[0].linear", 0.09f);
-  //     lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
-  //     // point light 2
-  //     lightingShader.setVec3("pointLights[1].position",
-  //     pointLightPositions[1]);
-  //     lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-  //     lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-  //     lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setFloat("pointLights[1].constant", 1.0f);
-  //     lightingShader.setFloat("pointLights[1].linear", 0.09f);
-  //     lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
-  //     // point light 3
-  //     lightingShader.setVec3("pointLights[2].position",
-  //     pointLightPositions[2]);
-  //     lightingShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-  //     lightingShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-  //     lightingShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setFloat("pointLights[2].constant", 1.0f);
-  //     lightingShader.setFloat("pointLights[2].linear", 0.09f);
-  //     lightingShader.setFloat("pointLights[2].quadratic", 0.032f);
-  //     // point light 4
-  //     lightingShader.setVec3("pointLights[3].position",
-  //     pointLightPositions[3]);
-  //     lightingShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-  //     lightingShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-  //     lightingShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setFloat("pointLights[3].constant", 1.0f);
-  //     lightingShader.setFloat("pointLights[3].linear", 0.09f);
-  //     lightingShader.setFloat("pointLights[3].quadratic", 0.032f);
-  //     // spotLight
-  //     lightingShader.setVec3("spotLight.position", camera.Position);
-  //     lightingShader.setVec3("spotLight.direction", camera.Front);
-  //     lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-  //     lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-  //     lightingShader.setFloat("spotLight.constant", 1.0f);
-  //     lightingShader.setFloat("spotLight.linear", 0.09f);
-  //     lightingShader.setFloat("spotLight.quadratic", 0.032f);
-  //     lightingShader.setFloat("spotLight.cutOff",
-  //     glm::cos(glm::radians(12.5f)));
-  //     lightingShader.setFloat("spotLight.outerCutOff",
-  //     glm::cos(glm::radians(15.0f)));
-
-  //     // view/projection transformations
-  //     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
-  //     (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f); glm::mat4 view =
-  //     camera.GetViewMatrix(); lightingShader.setMat4("projection",
-  //     projection); lightingShader.setMat4("view", view);
-
-  //     // world transformation
-  //     glm::mat4 model = glm::mat4(1.0f);
-  //     lightingShader.setMat4("model", model);
-
-  //     // bind diffuse map
-  //     glActiveTexture(GL_TEXTURE0);
-  //     glBindTexture(GL_TEXTURE_2D, diffuseMap);
-  //     // bind specular map
-  //     glActiveTexture(GL_TEXTURE1);
-  //     glBindTexture(GL_TEXTURE_2D, specularMap);
-
-  //     // render containers
-  //     glBindVertexArray(cubeVAO);
-  //     for (unsigned int i = 0; i < 10; i++)
-  //     {
-  //         // calculate the model matrix for each object and pass it to shader
-  //         before drawing glm::mat4 model = glm::mat4(1.0f); model =
-  //         glm::translate(model, cubePositions[i]); float angle = 20.0f * i;
-  //         model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f,
-  //         0.3f, 0.5f)); lightingShader.setMat4("model", model);
-
-  //         glDrawArrays(GL_TRIANGLES, 0, 36);
-  //     }
-
-  //     // also draw the lamp object(s)
-  //     lightCubeShader.use();
-  //     lightCubeShader.setMat4("projection", projection);
-  //     lightCubeShader.setMat4("view", view);
-
-  //     // we now draw as many light bulbs as we have point lights.
-  //     glBindVertexArray(lightCubeVAO);
-  //     for (unsigned int i = 0; i < 4; i++)
-  //     {
-  //         model = glm::mat4(1.0f);
-  //         model = glm::translate(model, pointLightPositions[i]);
-  //         model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller
-  //         cube lightCubeShader.setMat4("model", model);
-  //         glDrawArrays(GL_TRIANGLES, 0, 36);
-  //     }
-
-  //     // Render ImGui
-  //     drawIMGUI(window, camera, deltaTime, lastFrame);
-
-  //     // glfw: swap buffers and poll IO events (keys pressed/released, mouse
-  //     moved etc.)
-  //     //
-  //     -------------------------------------------------------------------------------
-  //     glfwSwapBuffers(window);
-  //     glfwPollEvents();
-  // }
-
-  // // optional: de-allocate all resources once they've outlived their purpose:
-  // // ------------------------------------------------------------------------
-  // glDeleteVertexArrays(1, &cubeVAO);
-  // glDeleteVertexArrays(1, &lightCubeVAO);
-  // glDeleteBuffers(1, &VBO);
 
   // Cleanup ImGui
   ImGui_ImplOpenGL3_Shutdown();
@@ -921,8 +564,7 @@ unsigned int loadTexture(char const *path)
 }
 
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer, unsigned int ssaoColor,
-               unsigned int ssaoColorBlur)
+               float &lastFrame, GBuffer &gbuffer)
 {
   // Start the Dear ImGui frame
   ImGui_ImplOpenGL3_NewFrame();
@@ -939,11 +581,12 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
   // }
 
   // GBuffer Debug Viewer
+#ifdef DEBUG_MODE
   {
     ImGui::Begin("GBuffer Debug Viewer");
 
     static int selectedBuffer = 0;
-    const char *bufferNames[] = {"Position", "Normal", "Albedo+Metal", "Rough+AO+Emiss", "SSAO", "SSAO Blurred"};
+    const char *bufferNames[] = {"Position", "Normal", "Depth", "Albedo+Spec", "Metal+Rough+AO", "Emissive"};
 
     ImGui::Combo("Buffer", &selectedBuffer, bufferNames, IM_ARRAYSIZE(bufferNames));
 
@@ -955,19 +598,19 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
       texID = gbuffer.texPosition;
       break;
     case 1:
-      texID = gbuffer.texNormal;
+      texID = gbuffer.texNormalDEBUG;
       break;
     case 2:
-      texID = gbuffer.texAlbedoMetal;
+      texID = gbuffer.texDepthDEBUG;
       break;
     case 3:
-      texID = gbuffer.texRoughAoEmiss;
+      texID = gbuffer.texAlbedoSpec;
       break;
     case 4:
-      texID = ssaoColor;
+      texID = gbuffer.texMatProps;
       break;
     case 5:
-      texID = ssaoColorBlur;
+      texID = gbuffer.texEmissive;
       break;
     }
 
@@ -998,39 +641,40 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::Text("Normal");
-    ImGui::Image((void *)(intptr_t)gbuffer.texNormal, ImVec2(thumbSize, thumbHeight),
+    ImGui::Image((void *)(intptr_t)gbuffer.texNormalDEBUG, ImVec2(thumbSize, thumbHeight),
                  ImVec2(0, 1), ImVec2(1, 0));
     ImGui::EndGroup();
 
     ImGui::SameLine();
     ImGui::BeginGroup();
-    ImGui::Text("Albedo+Metal");
-    ImGui::Image((void *)(intptr_t)gbuffer.texAlbedoMetal, ImVec2(thumbSize, thumbHeight),
+    ImGui::Text("Depth");
+    ImGui::Image((void *)(intptr_t)gbuffer.texDepthDEBUG, ImVec2(thumbSize, thumbHeight),
                  ImVec2(0, 1), ImVec2(1, 0));
     ImGui::EndGroup();
 
     ImGui::BeginGroup();
-    ImGui::Text("Rough+AO+Emiss");
-    ImGui::Image((void *)(intptr_t)gbuffer.texRoughAoEmiss, ImVec2(thumbSize, thumbHeight),
-                 ImVec2(0, 1), ImVec2(1, 0));
-    ImGui::EndGroup();
-
-    ImGui::SameLine();
-    ImGui::BeginGroup();
-    ImGui::Text("SSAO");
-    ImGui::Image((void *)(intptr_t)ssaoColor, ImVec2(thumbSize, thumbHeight),
+    ImGui::Text("Albedo+Spec");
+    ImGui::Image((void *)(intptr_t)gbuffer.texAlbedoSpec, ImVec2(thumbSize, thumbHeight),
                  ImVec2(0, 1), ImVec2(1, 0));
     ImGui::EndGroup();
 
     ImGui::SameLine();
     ImGui::BeginGroup();
-    ImGui::Text("SSAO Blurred");
-    ImGui::Image((void *)(intptr_t)ssaoColorBlur, ImVec2(thumbSize, thumbHeight),
+    ImGui::Text("Metal+Rough+AO");
+    ImGui::Image((void *)(intptr_t)gbuffer.texMatProps, ImVec2(thumbSize, thumbHeight),
+                 ImVec2(0, 1), ImVec2(1, 0));
+    ImGui::EndGroup();
+
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Text("Emissive");
+    ImGui::Image((void *)(intptr_t)gbuffer.texEmissive, ImVec2(thumbSize, thumbHeight),
                  ImVec2(0, 1), ImVec2(1, 0));
     ImGui::EndGroup();
 
     ImGui::End();
   }
+#endif
 
   // Shader editor
   {

@@ -1,10 +1,11 @@
 #version 330 core
 out vec4 FragColor;
-in vec2 Tex;
+in vec2 TexCoords;
 
 struct PointLight {
     vec3 position;
     vec3 color;
+    float intensity;
     float radius;
 };
 
@@ -14,16 +15,16 @@ uniform vec3 viewPos;
 
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
-uniform sampler2D gAlbedoMetal;
-uniform sampler2D gRoughAoEmiss;
-uniform sampler2D ssaoTex;
+uniform sampler2D gAlbedoSpec;
+uniform sampler2D gMatProps;
+uniform sampler2D gEmissive;
+uniform bool hasEmissive;
 
 const float PI = 3.14159265359;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0){
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
-
 float DistributionGGX(vec3 N, vec3 H, float rough){
     float a = rough*rough;
     float a2 = a*a;
@@ -46,45 +47,45 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float rough){
 }
 
 void main(){
-    vec3 pos = texture(gPosition, Tex).xyz;
-    vec3 N = normalize(texture(gNormal, Tex).xyz);
-    vec4 albedoMetal = texture(gAlbedoMetal, Tex);
-    vec4 pack = texture(gRoughAoEmiss, Tex);
-    vec3 albedo = pow(albedoMetal.rgb, vec3(2.2)); // gamma to linear
-    float metallic = albedoMetal.a;
-    float roughness = texture(gNormal, Tex).w;
-    float ao = pack.r * texture(ssaoTex, Tex).r;
-    float emiss = pack.g;
-    float specScalar = pack.a;
-    vec3 V = normalize(viewPos - pos);
-    vec3 F0 = mix(vec3(0.04*specScalar), albedo, metallic);
+    vec3 fragPos   = texture(gPosition, TexCoords).rgb;
+    vec3 N         = normalize(texture(gNormal, TexCoords).xyz);
+    vec3 albedo    = texture(gAlbedoSpec, TexCoords).rgb;
+    float specular = texture(gAlbedoSpec, TexCoords).a;
+    
+    vec4 matProps  = texture(gMatProps, TexCoords);
+    float metallic = matProps.r;
+    float roughness= matProps.g;
+    float ao       = matProps.b;
+
+    vec3 V = normalize(viewPos - fragPos);
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
     vec3 Lo = vec3(0.0);
     for(int i=0;i<uPointLightCount;i++){
         PointLight Lgt = uPointLights[i];
-        vec3 L = normalize(Lgt.position - pos);
+        vec3 L = normalize(Lgt.position - fragPos);
         vec3 H = normalize(V + L);
-        float dist = length(Lgt.position - pos);
-        float attenuation = 1.0 / (1.0 + dist*dist / (Lgt.radius*Lgt.radius));
-        float NdotL = max(dot(N,L),0.0);
+        float dist = length(Lgt.position - fragPos);
+        float attenuation = 1.0 / (1.0 + (dist*dist)/(Lgt.radius*Lgt.radius));
+        vec3 radiance = Lgt.color * Lgt.intensity * attenuation;
 
+        float NdotL = max(dot(N,L),0.0);
         float D = DistributionGGX(N,H,roughness);
         float G = GeometrySmith(N,V,L,roughness);
         vec3  F = fresnelSchlick(max(dot(H,V),0.0), F0);
 
         vec3 numerator = D*G*F;
         float denom = 4.0*max(dot(N,V),0.0)*NdotL + 0.001;
-        vec3 specular = numerator / denom;
+        vec3 specularTerm = numerator / denom;
 
         vec3 kS = F;
-        vec3 kD = (vec3(1.0)-kS)*(1.0 - metallic);
+        vec3 kD = (vec3(1.0)-kS) * (1.0 - metallic);
 
-        vec3 irradiance = Lgt.color * attenuation * NdotL;
-        Lo += (kD*albedo/PI + specular) * irradiance;
+        Lo += (kD*albedo/PI + specularTerm) * radiance * NdotL;
     }
-    vec3 ambient = albedo * ao * 0.01; // slightly darker baseline
 
-    vec3 color = ambient + Lo + vec3(emiss);
-    color = pow(color, vec3(1.0/2.2));
-    FragColor = vec4(color,1.0);
+    vec3 emissiveColor = hasEmissive ? texture(gEmissive, TexCoords).rgb : vec3(0.0);
+    vec3 ambient = albedo * ao * 0.03;
+    vec3 color = ambient + Lo + emissiveColor;
+    FragColor = vec4(color, 1.0);
 }
