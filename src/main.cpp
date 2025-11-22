@@ -150,9 +150,62 @@ int main()
       (std::string(RUNTIME_DATA_DIR) + "/shaders/model.fs").c_str(),
       "modelShader");
   // Model myModel("data/models/cow/source/sample-3d_glb.glb");
-  Model myModel(std::string(RUNTIME_DATA_DIR) + "/models/cow/source/sample-3d_glb.glb");
+  Model cowModel(std::string(RUNTIME_DATA_DIR) + "/models/cow/source/sample-3d_glb.glb");
   // myModel.setDefaultTexture("data/models/cow/textures/Textured_mesh_1_0.jpeg");
-  myModel.setDefaultTexture(std::string(RUNTIME_DATA_DIR) + "/models/cow/textures/Textured_mesh_1_0.jpeg");
+  // cowModel.setDefaultTexture(std::string(RUNTIME_DATA_DIR) + "/models/cow/textures/Textured_mesh_1_0.jpeg");
+  std::vector<Texture> cowTextures;
+  Texture tex;
+  tex.type = "texture_diffuse";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/models/cow/textures/Textured_mesh_1_0.jpeg";
+  tex.id = loadTexture(tex.path.c_str());
+  cowTextures.push_back(tex);
+  // Add fallback textures for cow so it doesn't sample plane textures
+  tex.type = "texture_specular";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  tex.id = loadTexture(tex.path.c_str());
+  cowTextures.push_back(tex);
+  tex.type = "texture_metallic";
+  cowTextures.push_back(tex);
+  tex.type = "texture_roughness";
+  cowTextures.push_back(tex);
+  tex.type = "texture_ao";
+  cowTextures.push_back(tex);
+  tex.type = "texture_emissive";
+  cowTextures.push_back(tex);
+
+  cowModel.setTextures(cowTextures);
+
+  // pbrTestPlane
+  std::vector<Texture> pbrTextures;
+  tex.type = "texture_diffuse";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_albedo.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_specular";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_normal";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_normal-ogl.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_metallic";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_metallic.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_roughness";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_ao";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_ao.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_emissive";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_emissive.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  Plane pbrTestPlane(10.0f, 10.0f, pbrTextures);
 
   // PBR Plane Model
 
@@ -231,8 +284,8 @@ int main()
   //     {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 6.f, RectangularPrism{{1.f, 1.f, 1.f}, {2.f, 2.f, 2.f}}},
   //     {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 5.f, RectangularPrism{{-4.f, 0.5f, -3.f}, {-2.f, 2.f, -1.f}}}};
   std::vector<PointLight> pointLights = {
-      {{2.f, 2.f, 2.f}, {0.f, 0.95f, 0.0f}, 10.f, 10.f, Sphere(0.02f, 36, 18, {})},
-      {{-3.f, 1.5f, -2.f}, {1.0f, 0.0f, 0.f}, 6.f, 8.f, Sphere(0.02f, 36, 18, {})}};
+      {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})},
+      {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 6.f, 5.f, Sphere(0.02f, 36, 18, {})}};
   // std::vector<PointLight> pointLights;
 
   Shader lightVolumeShader(
@@ -269,7 +322,8 @@ int main()
     deferredGeometryShader.setMat4("view", view);
     glm::mat4 modelMat(1.0f);
     deferredGeometryShader.setMat4("model", modelMat);
-    myModel.Draw(deferredGeometryShader);
+    cowModel.Draw(deferredGeometryShader);
+    pbrTestPlane.Draw(deferredGeometryShader);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Lighting pass

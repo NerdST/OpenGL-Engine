@@ -22,6 +22,8 @@ uniform bool hasEmissive;
 
 const float PI = 3.14159265359;
 
+const float emissiveStrength = 1.0;
+
 vec3 fresnelSchlick(float cosTheta, vec3 F0){
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
@@ -84,7 +86,7 @@ void main(){
         Lo += (kD*albedo/PI + specularTerm) * radiance * NdotL;
     }
 
-    vec3 emissiveColor = hasEmissive ? texture(gEmissive, TexCoords).rgb : vec3(0.0);
+    vec3 emissiveColor = hasEmissive ? texture(gEmissive, TexCoords).rgb * emissiveStrength : vec3(0.0);
     vec3 ambient = albedo * ao * 0.03;
     vec3 color = ambient + Lo + emissiveColor;
     FragColor = vec4(color, 1.0);

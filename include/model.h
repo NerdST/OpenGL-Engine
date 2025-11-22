@@ -38,31 +38,39 @@ public:
     loadModel(path);
   }
 
-  void setDefaultTexture(const string &texturePath)
-  {
-    std::cout << "Setting default texture: " << texturePath << std::endl;
-    unsigned int textureID = TextureFromFile(texturePath.c_str(), "", false);
+  // void setDefaultTexture(const string &texturePath)
+  // {
+  //   std::cout << "Setting default texture: " << texturePath << std::endl;
+  //   unsigned int textureID = TextureFromFile(texturePath.c_str(), "", false);
 
+  //   for (auto &mesh : meshes)
+  //   {
+  //     // Replace ALL textures, not just when empty
+  //     mesh.textures.clear(); // Clear existing (potentially invalid) textures
+
+  //     std::cout << "Adding default textures to mesh" << std::endl;
+
+  //     // Add diffuse texture
+  //     Texture diffuseTexture;
+  //     diffuseTexture.id = textureID;
+  //     diffuseTexture.type = "texture_diffuse";
+  //     diffuseTexture.path = texturePath;
+  //     mesh.textures.push_back(diffuseTexture);
+
+  //     // Add specular texture (same texture for now)
+  //     Texture specularTexture;
+  //     specularTexture.id = textureID;
+  //     specularTexture.type = "texture_specular";
+  //     specularTexture.path = texturePath;
+  //     mesh.textures.push_back(specularTexture);
+  //   }
+  // }
+
+  void setTextures(const vector<Texture> &newTextures)
+  {
     for (auto &mesh : meshes)
     {
-      // Replace ALL textures, not just when empty
-      mesh.textures.clear(); // Clear existing (potentially invalid) textures
-
-      std::cout << "Adding default textures to mesh" << std::endl;
-
-      // Add diffuse texture
-      Texture diffuseTexture;
-      diffuseTexture.id = textureID;
-      diffuseTexture.type = "texture_diffuse";
-      diffuseTexture.path = texturePath;
-      mesh.textures.push_back(diffuseTexture);
-
-      // Add specular texture (same texture for now)
-      Texture specularTexture;
-      specularTexture.id = textureID;
-      specularTexture.type = "texture_specular";
-      specularTexture.path = texturePath;
-      mesh.textures.push_back(specularTexture);
+      mesh.textures = newTextures;
     }
   }
 

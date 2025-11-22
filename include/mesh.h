@@ -31,6 +31,11 @@ public:
   Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures)
       : vertices(vertices), indices(indices), textures(textures)
   {
+    // Ensure textures are loaded
+    for (auto &texture : textures)
+    {
+      std::cout << "Loaded texture: " << texture.path << " of type: " << texture.type << std::endl;
+    }
     setupMesh();
   }
 

@@ -36,8 +36,8 @@ void main() {
     vec3 normal = normalize(fs_in.Normal);
     
     gPosition = vec4(fs_in.FragPos, linearDepth(fs_in.FragPos));
-    gNormal = vec4(normal, 0.0);
+    gNormal = vec4(normal, 1.0);
     gAlbedoSpec = vec4(albedo, specular);
-    gMatProps = vec4(metallic, roughness, ao, 0.0);
-    gEmissive = vec4(emissive, 0.0);
+    gMatProps = vec4(metallic, roughness, ao, 1.0);
+    gEmissive = vec4(emissive, 1.0);
 }
