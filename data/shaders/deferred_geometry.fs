@@ -26,6 +26,15 @@ uniform sampler2D texture_roughness1;
 uniform sampler2D texture_ao1;
 uniform sampler2D texture_emissive1;
 
+uniform bool hasDiffuse;
+uniform bool hasSpecular;
+uniform bool hasNormal;
+uniform bool hasMetallic;
+uniform bool hasHeight;
+uniform bool hasRoughness;
+uniform bool hasAO;
+uniform bool hasEmissive;
+
 uniform vec3 viewPos;
 uniform bool useParallaxMapping;
 
@@ -81,20 +90,26 @@ void main() {
 
     // Apply parallax mapping only if enabled and viewDir.z is positive
     vec2 texCoords = vs_out.TexCoords;
-    texCoords = ParallaxMapping(vs_out.TexCoords, viewDir, texture_height1);
+    // texCoords = ParallaxMapping(vs_out.TexCoords, viewDir, texture_height1);
+    if (hasHeight && viewDir.z > 0.0) {
+        texCoords = ParallaxMapping(vs_out.TexCoords, viewDir, texture_height1);
+    } else {
+        texCoords = vs_out.TexCoords;
+    }
 
-    vec3 normalMap = texture(texture_normal1, texCoords).rgb;
+    // vec3 normalMap = texture(texture_normal1, texCoords).rgb;
+    vec3 normalMap = hasNormal ? texture(texture_normal1, texCoords).rgb : vec3(0.5, 0.5, 1.0);
     normalMap = normalize(normalMap * 2.0 - 1.0);
 
     vec3 normal = normalize(vs_out.TBN * normalMap);
 
-    vec3 albedo = texture(texture_diffuse1, texCoords).rgb;
-    float specular = texture(texture_specular1, texCoords).r;
-    float metallic = texture(texture_metallic1, texCoords).r;
-    float height = texture(texture_height1, texCoords).r;
-    float roughness = texture(texture_roughness1, texCoords).r;
-    float ao = texture(texture_ao1, texCoords).r;
-    vec3 emissive = texture(texture_emissive1, texCoords).rgb;
+    vec3 albedo = hasDiffuse ? texture(texture_diffuse1, texCoords).rgb : vec3(1.0, 0.0, 1.0);
+    float specular = hasSpecular ? texture(texture_specular1, texCoords).r : 0.04;
+    float metallic = hasMetallic ? texture(texture_metallic1, texCoords).r : 0.0;
+    float height = hasHeight ? texture(texture_height1, texCoords).r : 0.0;
+    float roughness = hasRoughness ? texture(texture_roughness1, texCoords).r : 0.5;
+    float ao = hasAO ? texture(texture_ao1, texCoords).r : 1.0;
+    vec3 emissive = hasEmissive ? texture(texture_emissive1, texCoords).rgb : vec3(0.0);
 
     // vec3 normal = normalize(fs_in.Normal);
 

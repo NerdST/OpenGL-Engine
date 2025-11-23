@@ -27,6 +27,7 @@ class Model
 {
 public:
   // model data
+  std::string name;
   vector<Texture> textures_loaded; // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
   vector<Mesh> meshes;
   string directory;
@@ -122,6 +123,7 @@ private:
   Mesh processMesh(aiMesh *mesh, const aiScene *scene)
   {
     // data to fill
+    std::string meshName = mesh->mName.C_Str();
     vector<Vertex> vertices;
     vector<unsigned int> indices;
     vector<Texture> textures;
@@ -221,10 +223,10 @@ private:
     vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
     // 3. normal maps
-    std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+    std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
     textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
     // 4. height maps
-    std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
+    std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_height");
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
     // Add PBR maps (if authoring tool exported them)
@@ -237,63 +239,65 @@ private:
     textures.insert(textures.end(), roughnessMaps.begin(), roughnessMaps.end());
 
     // ambient occlusion maps
-    vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT_OCCLUSION, "texture_ao");
+    vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_LIGHTMAP, "texture_ao");
+    textures.insert(textures.end(), aoMaps.begin(), aoMaps.end());
+    aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT_OCCLUSION, "texture_ao");
     textures.insert(textures.end(), aoMaps.begin(), aoMaps.end());
 
     // emissive maps
     vector<Texture> emissiveMaps = loadMaterialTextures(material, aiTextureType_EMISSIVE, "texture_emissive");
     textures.insert(textures.end(), emissiveMaps.begin(), emissiveMaps.end());
 
-    // Fallback textures (load once per type)
-    static unsigned int fallbackDiffuse = 0;
-    static unsigned int fallbackBlack = 0;
-    static unsigned int fallbackWhite = 0;
+    // // Fallback textures (load once per type)
+    // static unsigned int fallbackDiffuse = 0;
+    // static unsigned int fallbackBlack = 0;
+    // static unsigned int fallbackWhite = 0;
 
-    if (fallbackDiffuse == 0)
-    {
-      fallbackDiffuse = TextureFromFile("data/textures/FALLBACK.png", "", false);
+    // if (fallbackDiffuse == 0)
+    // {
+    //   fallbackDiffuse = TextureFromFile("data/textures/FALLBACK.png", "", false);
 
-      // Create 1x1 black texture for emissive/metallic
-      unsigned char blackPixel[] = {0, 0, 0, 255};
-      glGenTextures(1, &fallbackBlack);
-      glBindTexture(GL_TEXTURE_2D, fallbackBlack);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, blackPixel);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    //   // Create 1x1 black texture for emissive/metallic
+    //   unsigned char blackPixel[] = {0, 0, 0, 255};
+    //   glGenTextures(1, &fallbackBlack);
+    //   glBindTexture(GL_TEXTURE_2D, fallbackBlack);
+    //   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, blackPixel);
+    //   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-      // Create 1x1 white texture for AO/roughness
-      unsigned char whitePixel[] = {255, 255, 255, 255};
-      glGenTextures(1, &fallbackWhite);
-      glBindTexture(GL_TEXTURE_2D, fallbackWhite);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+    //   // Create 1x1 white texture for AO/roughness
+    //   unsigned char whitePixel[] = {255, 255, 255, 255};
+    //   glGenTextures(1, &fallbackWhite);
+    //   glBindTexture(GL_TEXTURE_2D, fallbackWhite);
+    //   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
+    //   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // }
 
-    auto ensureType = [&](const char *typeName, unsigned int defaultTexID)
-    {
-      bool found = false;
-      for (auto &t : textures)
-        if (t.type == typeName)
-        {
-          found = true;
-          break;
-        }
-      if (!found)
-      {
-        Texture ft;
-        ft.id = defaultTexID;
-        ft.type = typeName;
-        ft.path = "procedural";
-        textures.push_back(ft);
-      }
-    };
-    ensureType("texture_diffuse", fallbackDiffuse);
-    ensureType("texture_specular", fallbackBlack);
-    ensureType("texture_metallic", fallbackBlack);
-    ensureType("texture_roughness", fallbackWhite);
-    ensureType("texture_ao", fallbackWhite);
-    ensureType("texture_emissive", fallbackBlack);
+    // auto ensureType = [&](const char *typeName, unsigned int defaultTexID)
+    // {
+    //   bool found = false;
+    //   for (auto &t : textures)
+    //     if (t.type == typeName)
+    //     {
+    //       found = true;
+    //       break;
+    //     }
+    //   if (!found)
+    //   {
+    //     Texture ft;
+    //     ft.id = defaultTexID;
+    //     ft.type = typeName;
+    //     ft.path = "procedural";
+    //     textures.push_back(ft);
+    //   }
+    // };
+    // ensureType("texture_diffuse", fallbackDiffuse);
+    // ensureType("texture_specular", fallbackBlack);
+    // ensureType("texture_metallic", fallbackBlack);
+    // ensureType("texture_roughness", fallbackWhite);
+    // ensureType("texture_ao", fallbackWhite);
+    // ensureType("texture_emissive", fallbackBlack);
 
     return Mesh(vertices, indices, textures);
   }

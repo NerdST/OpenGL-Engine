@@ -119,8 +119,10 @@ private:
         glm::vec3 position = glm::vec3(x, y, z);
         glm::vec3 normal = glm::normalize(position);
         glm::vec2 texCoords = glm::vec2((float)j / sectorCount, (float)i / stackCount);
+        glm::vec3 tangent = glm::vec3(-sinf(sectorAngle), cosf(sectorAngle), 0.0f);
+        glm::vec3 bitangent = glm::cross(normal, tangent);
 
-        vertices.push_back({position, normal, texCoords});
+        vertices.push_back({position, normal, texCoords, tangent, bitangent});
       }
     }
     return vertices;

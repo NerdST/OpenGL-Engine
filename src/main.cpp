@@ -17,7 +17,7 @@
 #include <map>
 #include <string>
 
-// #define DEBUG_MODE
+#define DEBUG_MODE
 
 #include <camera.h>
 #include <model.h>
@@ -150,6 +150,7 @@ int main()
       "modelShader");
   // Model myModel("data/models/cow/source/sample-3d_glb.glb");
   Model cowModel(std::string(RUNTIME_DATA_DIR) + "/models/cow/source/sample-3d_glb.glb");
+  cowModel.name = "cowModel";
   // myModel.setDefaultTexture("data/models/cow/textures/Textured_mesh_1_0.jpeg");
   // cowModel.setDefaultTexture(std::string(RUNTIME_DATA_DIR) + "/models/cow/textures/Textured_mesh_1_0.jpeg");
   std::vector<Texture> cowTextures;
@@ -159,28 +160,28 @@ int main()
   tex.id = loadTexture(tex.path.c_str());
   cowTextures.push_back(tex);
   // Add fallback textures for cow so it doesn't sample plane textures
-  tex.type = "texture_specular";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
-  tex.id = loadTexture(tex.path.c_str());
-  cowTextures.push_back(tex);
-  tex.type = "texture_normal";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_NORMAL.png";
-  tex.id = loadTexture(tex.path.c_str());
-  cowTextures.push_back(tex);
-  tex.type = "texture_height";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_WHITE.png";
-  tex.id = loadTexture(tex.path.c_str());
-  cowTextures.push_back(tex);
-  tex.type = "texture_metallic";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
-  tex.id = loadTexture(tex.path.c_str());
-  cowTextures.push_back(tex);
-  tex.type = "texture_roughness";
-  cowTextures.push_back(tex);
-  tex.type = "texture_ao";
-  cowTextures.push_back(tex);
-  tex.type = "texture_emissive";
-  cowTextures.push_back(tex);
+  // tex.type = "texture_specular";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_normal";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_NORMAL.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_height";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_WHITE.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_metallic";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_roughness";
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_ao";
+  // cowTextures.push_back(tex);
+  // tex.type = "texture_emissive";
+  // cowTextures.push_back(tex);
 
   cowModel.setTextures(cowTextures);
 
@@ -190,10 +191,10 @@ int main()
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_albedo.png";
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
-  tex.type = "texture_specular";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
-  tex.id = loadTexture(tex.path.c_str());
-  pbrTextures.push_back(tex);
+  // tex.type = "texture_specular";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // pbrTextures.push_back(tex);
   tex.type = "texture_normal";
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_normal-ogl.png";
   tex.id = loadTexture(tex.path.c_str());
@@ -202,10 +203,10 @@ int main()
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_metallic.png";
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
-  tex.type = "texture_roughness";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_rough.png";
-  tex.id = loadTexture(tex.path.c_str());
-  pbrTextures.push_back(tex);
+  // tex.type = "texture_roughness";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_rough.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // pbrTextures.push_back(tex);
   tex.type = "texture_ao";
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_ao.png";
   tex.id = loadTexture(tex.path.c_str());
@@ -219,6 +220,7 @@ int main()
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
   Plane pbrTestPlane(10.0f, 10.0f, pbrTextures);
+  pbrTestPlane.name = "pbrTestPlane";
 
   // PBR Plane Model
 
@@ -291,19 +293,23 @@ int main()
 
   struct PointLight
   {
-    glm::vec3 pos;
-    glm::vec3 color;
-    float intensity;
-    float radius;
-    Sphere lightVolume;
+    glm::vec3 pos{0.0f};
+    glm::vec3 color{1.0f};
+    float intensity{1.0f};
+    float radius{1.0f};
+    Sphere lightVolume{0.02f, 36, 18, {}}; // default sphere so PointLight is default-constructible
   };
   // std::vector<PointLight> pointLights = {
-  //     {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 6.f, RectangularPrism{{1.f, 1.f, 1.f}, {2.f, 2.f, 2.f}}},
-  //     {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 5.f, RectangularPrism{{-4.f, 0.5f, -3.f}, {-2.f, 2.f, -1.f}}}};
-  std::vector<PointLight> pointLights = {
-      {{2.f, 2.f, 2.f}, {0.2f, 0.95f, 0.0f}, 6.f, 6.f, Sphere(0.02f, 36, 18, {})},
-      {{-3.f, 1.5f, -2.f}, {0.0f, 0.0f, 1.f}, 10.f, 5.f, Sphere(0.02f, 36, 18, {})}};
-  // std::vector<PointLight> pointLights;
+  //     {{2.f, 2.f, 2.f}, {0.2f, 0.95f, 0.0f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})},
+  //     {{-3.f, 1.5f, -2.f}, {0.0f, 0.0f, 1.f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})}};
+  std::vector<PointLight> pointLights;
+  // Generate random point lights
+  // pointLights.push_back({{2.f, 2.f, 2.f}, {.9f, 1.f, .85f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
+  // pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, .8f, .7f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
+  // A warm white light
+  pointLights.push_back({{2.f, 2.f, 2.f}, {1.0f, 0.956f, 0.84f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
+  // A cool white light
+  pointLights.push_back({{-3.f, 1.5f, -2.f}, {0.8f, 0.9f, 1.0f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
 
   Shader lightVolumeShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/lights.vs").c_str(),
@@ -413,12 +419,13 @@ uniform sampler2D gRoughAoEmiss;
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer.fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Tonemap
+    glDisable(GL_DEPTH_TEST);
     HDRShader.use();
     HDRShader.setBool("hdr", true);
-    HDRShader.setFloat("exposure", 0.1f);
+    HDRShader.setFloat("exposure", 1.0f);
     HDRShader.setInt("hdrBuffer", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer.bufHDR);

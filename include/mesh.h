@@ -24,6 +24,7 @@ class Mesh
 {
 public:
   // mesh data
+  std::string name;
   std::vector<Vertex> vertices;
   std::vector<unsigned int> indices;
   std::vector<Texture> textures;
@@ -45,7 +46,10 @@ public:
     unsigned int metallicNr = 1, roughnessNr = 1, aoNr = 1, emissiveNr = 1;
 
     // Track presence flags
-    bool hasEmissive = false;
+    bool hasDiffuse = false, hasSpecular = false,
+         hasNormal = false, hasMetallic = false,
+         hasRoughness = false, hasAO = false,
+         hasHeight = false, hasEmissive = false;
 
     for (unsigned int i = 0; i < textures.size(); i++)
     {
@@ -53,19 +57,40 @@ public:
       std::string number;
       std::string name = textures[i].type;
       if (name == "texture_diffuse")
+      {
         number = std::to_string(diffuseNr++);
+        hasDiffuse = true;
+      }
       else if (name == "texture_specular")
+      {
         number = std::to_string(specularNr++);
+        hasSpecular = true;
+      }
       else if (name == "texture_normal")
+      {
         number = std::to_string(normalNr++);
+        hasNormal = true;
+      }
       else if (name == "texture_metallic")
+      {
         number = std::to_string(metallicNr++);
+        hasMetallic = true;
+      }
       else if (name == "texture_roughness")
+      {
         number = std::to_string(roughnessNr++);
+        hasRoughness = true;
+      }
       else if (name == "texture_ao")
+      {
         number = std::to_string(aoNr++);
+        hasAO = true;
+      }
       else if (name == "texture_height")
+      {
         number = std::to_string(heightNr++);
+        hasHeight = true;
+      }
       else if (name == "texture_emissive")
       {
         number = std::to_string(emissiveNr++);
@@ -77,7 +102,15 @@ public:
       glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
     // Provide presence flags the shaders can use
+    shader.setBool("hasDiffuse", hasDiffuse);
+    shader.setBool("hasSpecular", hasSpecular);
+    shader.setBool("hasNormal", hasNormal);
+    shader.setBool("hasMetallic", hasMetallic);
+    shader.setBool("hasRoughness", hasRoughness);
+    shader.setBool("hasAO", hasAO);
+    shader.setBool("hasHeight", hasHeight);
     shader.setBool("hasEmissive", hasEmissive);
+    // std::cout << "Mesh " << this->name << ": has emissive? " << (hasEmissive ? "Yes" : "No") << std::endl;
 
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(VAO);
