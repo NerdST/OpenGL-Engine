@@ -8,7 +8,7 @@ struct GBuffer
   unsigned int texPosition = 0;
   unsigned int texNormal = 0;
   unsigned int texAlbedoSpec = 0;
-  unsigned int texMatProps = 0; // metal + roughness + AO
+  unsigned int texMatProps = 0; // metal + roughness + AO + height
   unsigned int texEmissive = 0;
   unsigned int rboDepth = 0;
 
@@ -107,6 +107,8 @@ struct GBuffer
       return false;
     }
 
+#ifdef DEBUG_MODE
+
     // DEBUG FBO
     glGenFramebuffers(1, &DEBUGfbo);
     glBindFramebuffer(GL_FRAMEBUFFER, DEBUGfbo);
@@ -127,6 +129,8 @@ struct GBuffer
 
     GLenum debugAttachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, debugAttachments);
+
+#endif
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {

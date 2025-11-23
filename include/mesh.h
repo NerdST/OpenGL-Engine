@@ -58,14 +58,14 @@ public:
         number = std::to_string(specularNr++);
       else if (name == "texture_normal")
         number = std::to_string(normalNr++);
-      else if (name == "texture_height")
-        number = std::to_string(heightNr++);
       else if (name == "texture_metallic")
         number = std::to_string(metallicNr++);
       else if (name == "texture_roughness")
         number = std::to_string(roughnessNr++);
       else if (name == "texture_ao")
         number = std::to_string(aoNr++);
+      else if (name == "texture_height")
+        number = std::to_string(heightNr++);
       else if (name == "texture_emissive")
       {
         number = std::to_string(emissiveNr++);

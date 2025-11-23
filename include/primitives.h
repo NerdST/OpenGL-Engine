@@ -16,10 +16,11 @@ private:
   std::vector<Vertex> generateVertices(float width, float height)
   {
     return {
-      {{-width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{ width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{ width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{-width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+      // Position                       // Normal         // TexCoords  // Tangent            // Bitangent
+      {{-width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+      {{ width / 2, 0.0f, -height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+      {{ width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+      {{-width / 2, 0.0f,  height / 2}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
     };
   }
 

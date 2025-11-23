@@ -4,20 +4,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <camera.h>
-#include <model.h>
-#include <primitives.h>
-#include <shader.h>
-#include <buffers.h>
-
 // ImGui includes
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/imgui.h"
-
-#include <iostream>
 #include <stb_image.h>
 
+#include <iostream>
 #include <vector>
 #include <random>
 #include <array>
@@ -25,6 +18,12 @@
 #include <string>
 
 #define DEBUG_MODE
+
+#include <camera.h>
+#include <model.h>
+#include <primitives.h>
+#include <shader.h>
+#include <buffers.h>
 
 // Initialize static member
 std::map<std::string, Shader *> Shader::shaders;
@@ -164,7 +163,17 @@ int main()
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
   tex.id = loadTexture(tex.path.c_str());
   cowTextures.push_back(tex);
+  tex.type = "texture_normal";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_NORMAL.png";
+  tex.id = loadTexture(tex.path.c_str());
+  cowTextures.push_back(tex);
+  tex.type = "texture_height";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK_WHITE.png";
+  tex.id = loadTexture(tex.path.c_str());
+  cowTextures.push_back(tex);
   tex.type = "texture_metallic";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  tex.id = loadTexture(tex.path.c_str());
   cowTextures.push_back(tex);
   tex.type = "texture_roughness";
   cowTextures.push_back(tex);
@@ -194,11 +203,15 @@ int main()
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
   tex.type = "texture_roughness";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/FALLBACK.png";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_rough.png";
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
   tex.type = "texture_ao";
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_ao.png";
+  tex.id = loadTexture(tex.path.c_str());
+  pbrTextures.push_back(tex);
+  tex.type = "texture_height";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_height.png";
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
   tex.type = "texture_emissive";
@@ -320,10 +333,13 @@ int main()
     deferredGeometryShader.use();
     deferredGeometryShader.setMat4("projection", projection);
     deferredGeometryShader.setMat4("view", view);
+    deferredGeometryShader.setVec3("viewPos", camera.Position);
     glm::mat4 modelMat(1.0f);
     deferredGeometryShader.setMat4("model", modelMat);
+
     cowModel.Draw(deferredGeometryShader);
     pbrTestPlane.Draw(deferredGeometryShader);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Lighting pass
