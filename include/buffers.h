@@ -141,4 +141,43 @@ struct GBuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return true;
   }
+
+  void resize(int width, int height)
+  {
+    // Resize GBuffer textures
+    glBindTexture(GL_TEXTURE_2D, texPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, texNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, texAlbedoSpec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, texMatProps);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, texEmissive);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    // Resize depth renderbuffer
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+
+    // Resize HDR buffer
+    glBindTexture(GL_TEXTURE_2D, bufHDR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+#ifdef DEBUG_MODE
+    // Resize DEBUG textures
+    glBindTexture(GL_TEXTURE_2D, texNormalDEBUG);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, texDepthDEBUG);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+#endif
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  }
 };

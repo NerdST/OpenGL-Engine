@@ -17,7 +17,7 @@
 #include <map>
 #include <string>
 
-#define DEBUG_MODE
+// #define DEBUG_MODE
 
 #include <camera.h>
 #include <model.h>
@@ -44,8 +44,8 @@ unsigned int loadTexture(char const *path);
 ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 
 // settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+unsigned int SCR_WIDTH = 1280;
+unsigned int SCR_HEIGHT = 720;
 
 // camera
 Camera camera(glm::vec3(5.0f, 1.0f, 5.0f));
@@ -236,6 +236,10 @@ int main()
   {
     std::cout << "GBuffer init failed\n";
   }
+
+  // Store gbuffer pointer in window user data so resize callback can access it
+  glfwSetWindowUserPointer(window, &gbuffer);
+
   // Shader deferredGeometryShader("data/shaders/deferred.vs", "data/shaders/deferred.fs", "deferredGeometryShader");
   Shader deferredGeometryShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/deferred_geometry.vs").c_str(),
@@ -297,8 +301,8 @@ int main()
   //     {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 6.f, RectangularPrism{{1.f, 1.f, 1.f}, {2.f, 2.f, 2.f}}},
   //     {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 5.f, RectangularPrism{{-4.f, 0.5f, -3.f}, {-2.f, 2.f, -1.f}}}};
   std::vector<PointLight> pointLights = {
-      {{2.f, 2.f, 2.f}, {1.f, 0.95f, 0.8f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})},
-      {{-3.f, 1.5f, -2.f}, {0.6f, 0.8f, 1.f}, 6.f, 5.f, Sphere(0.02f, 36, 18, {})}};
+      {{2.f, 2.f, 2.f}, {0.2f, 0.95f, 0.0f}, 6.f, 6.f, Sphere(0.02f, 36, 18, {})},
+      {{-3.f, 1.5f, -2.f}, {0.0f, 0.0f, 1.f}, 10.f, 5.f, Sphere(0.02f, 36, 18, {})}};
   // std::vector<PointLight> pointLights;
 
   Shader lightVolumeShader(
@@ -526,6 +530,15 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
   // make sure the viewport matches the new window dimensions; note that width
   // and height will be significantly larger than specified on retina displays.
   glViewport(0, 0, width, height);
+  SCR_WIDTH = width;
+  SCR_HEIGHT = height;
+
+  // Resize GBuffer to match new window dimensions
+  GBuffer *gbuffer = static_cast<GBuffer *>(glfwGetWindowUserPointer(window));
+  if (gbuffer)
+  {
+    gbuffer->resize(width, height);
+  }
 }
 
 // glfw: whenever the mouse moves, this callback is called
