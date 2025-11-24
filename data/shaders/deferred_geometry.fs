@@ -37,6 +37,9 @@ uniform bool hasEmissive;
 
 uniform vec3 viewPos;
 uniform bool useParallaxMapping;
+uniform bool isLightVolume;
+uniform vec3 lightColor;
+uniform float emissiveStrength;
 
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, sampler2D heightMap) {
     // Number of layers based on view angle (more layers when viewing at steep angles)
@@ -104,12 +107,16 @@ void main() {
     vec3 normal = normalize(vs_out.TBN * normalMap);
 
     vec3 albedo = hasDiffuse ? texture(texture_diffuse1, texCoords).rgb : vec3(1.0, 0.0, 1.0);
+    if (isLightVolume)
+        albedo = lightColor;
     float specular = hasSpecular ? texture(texture_specular1, texCoords).r : 0.04;
     float metallic = hasMetallic ? texture(texture_metallic1, texCoords).r : 0.0;
     float height = hasHeight ? texture(texture_height1, texCoords).r : 0.0;
     float roughness = hasRoughness ? texture(texture_roughness1, texCoords).r : 0.5;
     float ao = hasAO ? texture(texture_ao1, texCoords).r : 1.0;
     vec3 emissive = hasEmissive ? texture(texture_emissive1, texCoords).rgb : vec3(0.0);
+    if (isLightVolume)
+        emissive = lightColor * emissiveStrength;
 
     // vec3 normal = normalize(fs_in.Normal);
 

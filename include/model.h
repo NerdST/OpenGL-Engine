@@ -304,7 +304,7 @@ private:
 
   // checks all material textures of a given type and loads the textures if they're not loaded yet.
   // the required info is returned as a Texture struct.
-  vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName)
+  vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, const string typeName)
   {
     vector<Texture> textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)

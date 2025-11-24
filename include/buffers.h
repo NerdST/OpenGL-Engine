@@ -14,6 +14,10 @@ struct GBuffer
 
   unsigned int HDRfbo = 0;
   unsigned int bufHDR = 0;
+  unsigned int texBright = 0;
+
+  unsigned int PingPongfbo[2] = {0, 0};
+  unsigned int PingPongColorbuffers[2] = {0, 0};
 
   unsigned int DEBUGfbo = 0;
   unsigned int texNormalDEBUG = 0;
@@ -91,15 +95,41 @@ struct GBuffer
     glGenFramebuffers(1, &HDRfbo);
     glBindFramebuffer(GL_FRAMEBUFFER, HDRfbo);
 
-    glGenTextures(1, &bufHDR);
+    glGenTextures(1, &bufHDR); // HDR color buffer
     glBindTexture(GL_TEXTURE_2D, bufHDR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // Comment out of needed
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Comment out of needed
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufHDR, 0);
 
-    GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-    glDrawBuffers(1, drawBuffers);
+    glGenTextures(1, &texBright); // Brightness extraction
+    glBindTexture(GL_TEXTURE_2D, texBright);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // Comment out of needed
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Comment out of needed
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texBright, 0);
+
+    GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawBuffers);
+
+    // Ping-Pong framebuffers for blurring
+    glGenFramebuffers(2, PingPongfbo);
+    glGenTextures(2, PingPongColorbuffers);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+      glBindFramebuffer(GL_FRAMEBUFFER, PingPongfbo[i]);
+      glBindTexture(GL_TEXTURE_2D, PingPongColorbuffers[i]);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width / BLOOM_SCALE, height / BLOOM_SCALE, 0, GL_RGBA, GL_FLOAT, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // Comment out of needed
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Comment out of needed
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, PingPongColorbuffers[i], 0);
+    }
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {

@@ -19,6 +19,9 @@
 
 #define DEBUG_MODE
 
+// Bloom parameters
+const float BLOOM_SCALE = 8.0f;
+
 #include <camera.h>
 #include <model.h>
 #include <primitives.h>
@@ -256,7 +259,10 @@ int main()
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
       (std::string(RUNTIME_DATA_DIR) + "/shaders/hdr.fs").c_str(),
       "HDRShader");
-
+  Shader blurShader(
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
+      (std::string(RUNTIME_DATA_DIR) + "/shaders/blur.fs").c_str(),
+      "blurShader");
 #ifdef DEBUG_MODE
   Shader debugNormalShader(
       (std::string(RUNTIME_DATA_DIR) + "/shaders/fullscreen_quad.vs").c_str(),
@@ -307,14 +313,9 @@ int main()
   // pointLights.push_back({{2.f, 2.f, 2.f}, {.9f, 1.f, .85f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, .8f, .7f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
   // A warm white light
-  pointLights.push_back({{2.f, 2.f, 2.f}, {1.0f, 0.956f, 0.84f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
+  pointLights.push_back({{2.f, 2.f, 2.f}, {0.0f, 0.3f, 0.9f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // A cool white light
-  pointLights.push_back({{-3.f, 1.5f, -2.f}, {0.8f, 0.9f, 1.0f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
-
-  Shader lightVolumeShader(
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/lights.vs").c_str(),
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/lights.fs").c_str(),
-      "lightVolumeShader");
+  pointLights.push_back({{-3.f, 1.5f, -2.f}, {0.7f, 0.0f, 1.0f}, 9.0f, 5.f, Sphere(0.02f, 36, 18, {})});
 
   // render loop
   // -----------
@@ -349,6 +350,18 @@ int main()
 
     cowModel.Draw(deferredGeometryShader);
     pbrTestPlane.Draw(deferredGeometryShader);
+    for (auto &pl : pointLights)
+    {
+      modelMat = glm::mat4(1.0f);
+      modelMat = glm::translate(modelMat, pl.pos);
+      modelMat = glm::scale(modelMat, glm::vec3(pl.radius));
+      deferredGeometryShader.setMat4("model", modelMat);
+      deferredGeometryShader.setBool("isLightVolume", true);
+      deferredGeometryShader.setVec3("lightColor", pl.color);
+      deferredGeometryShader.setFloat("emissiveStrength", pl.intensity);
+      pl.lightVolume.Draw(deferredGeometryShader);
+      deferredGeometryShader.setBool("isLightVolume", false);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -407,28 +420,62 @@ uniform sampler2D gRoughAoEmiss;
       deferredLightingShader.setFloat(baseName + ".radius", pointLights[i].radius);
     }
 
-    // Lighting pass -> HDR FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.HDRfbo);
-    glClear(GL_COLOR_BUFFER_BIT);
-    deferredLightingShader.use();
-
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
     // Copy depth from GBuffer to default framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer.fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Tonemap
+    // Lighting pass -> HDR FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.HDRfbo);
+    GLenum hdrBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, hdrBuffers);
+    glClear(GL_COLOR_BUFFER_BIT);
+    deferredLightingShader.use();
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    // =============== BLUR PASS =================
+    bool horizontal = true, first_iteration = true;
+    unsigned int amount = 10;
+    blurShader.use();
+
+    glViewport(0, 0, SCR_WIDTH / BLOOM_SCALE, SCR_HEIGHT / BLOOM_SCALE); // Change viewport to match bloom texture size
+
+    for (unsigned int i = 0; i < amount; i++)
+    {
+      glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.PingPongfbo[horizontal]);
+      blurShader.setInt("horizontal", horizontal);
+
+      // On first iteration, bind brightness texture from lighting pass
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, first_iteration ? gbuffer.texBright : gbuffer.PingPongColorbuffers[!horizontal]);
+
+      glBindVertexArray(quadVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+
+      horizontal = !horizontal;
+      if (first_iteration)
+        first_iteration = false;
+    }
+
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT); // Reset viewport to window size
+
+    // Tonemap (Final to Screen)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     HDRShader.use();
     HDRShader.setBool("hdr", true);
     HDRShader.setFloat("exposure", 1.0f);
-    HDRShader.setInt("hdrBuffer", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer.bufHDR);
+    HDRShader.setInt("hdrBuffer", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gbuffer.PingPongColorbuffers[!horizontal]);
+    HDRShader.setInt("bloomBlur", 1);
+
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glEnable(GL_DEPTH_TEST);
@@ -463,28 +510,28 @@ uniform sampler2D gRoughAoEmiss;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #endif
 
-    // Draw light volumes (for visualization) - AFTER lighting pass, on main framebuffer
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // Don't write to depth buffer
+    // // Draw light volumes (for visualization) - AFTER lighting pass, on main framebuffer
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glDepthMask(GL_FALSE); // Don't write to depth buffer
 
-    lightVolumeShader.use();
-    lightVolumeShader.setMat4("projection", projection);
-    lightVolumeShader.setMat4("view", view);
-    lightVolumeShader.setFloat("alpha", 1.0f); // Add alpha uniform
+    // lightVolumeShader.use();
+    // lightVolumeShader.setMat4("projection", projection);
+    // lightVolumeShader.setMat4("view", view);
+    // lightVolumeShader.setFloat("alpha", 1.0f); // Add alpha uniform
 
-    for (auto &pl : pointLights)
-    {
-      glm::mat4 model = glm::mat4(1.0f);
-      model = glm::translate(model, pl.pos);
-      model = glm::scale(model, glm::vec3(pl.radius));
-      lightVolumeShader.setMat4("model", model);
-      lightVolumeShader.setVec3("lightColor", pl.color);
-      pl.lightVolume.Draw(lightVolumeShader);
-    }
+    // for (auto &pl : pointLights)
+    // {
+    //   glm::mat4 model = glm::mat4(1.0f);
+    //   model = glm::translate(model, pl.pos);
+    //   model = glm::scale(model, glm::vec3(pl.radius));
+    //   lightVolumeShader.setMat4("model", model);
+    //   lightVolumeShader.setVec3("lightColor", pl.color);
+    //   pl.lightVolume.Draw(lightVolumeShader);
+    // }
 
-    glDepthMask(GL_TRUE); // Re-enable depth writing
-    glDisable(GL_BLEND);
+    // glDepthMask(GL_TRUE); // Re-enable depth writing
+    // glDisable(GL_BLEND);
 
     drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer);
 

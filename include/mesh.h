@@ -37,15 +37,13 @@ public:
     {
       std::cout << "Loaded texture: " << texture.path << " of type: " << texture.type << std::endl;
     }
+    processTextures();
     setupMesh();
   }
 
-  void Draw(Shader &shader)
+  void Draw(Shader &shader) const
   {
-    unsigned int diffuseNr = 1, specularNr = 1, normalNr = 1, heightNr = 1;
-    unsigned int metallicNr = 1, roughnessNr = 1, aoNr = 1, emissiveNr = 1;
-
-    // Track presence flags
+    // Track presence flags - these must still be calculated here
     bool hasDiffuse = false, hasSpecular = false,
          hasNormal = false, hasMetallic = false,
          hasRoughness = false, hasAO = false,
@@ -54,53 +52,33 @@ public:
     for (unsigned int i = 0; i < textures.size(); i++)
     {
       glActiveTexture(GL_TEXTURE0 + i);
-      std::string number;
-      std::string name = textures[i].type;
-      if (name == "texture_diffuse")
-      {
-        number = std::to_string(diffuseNr++);
-        hasDiffuse = true;
-      }
-      else if (name == "texture_specular")
-      {
-        number = std::to_string(specularNr++);
-        hasSpecular = true;
-      }
-      else if (name == "texture_normal")
-      {
-        number = std::to_string(normalNr++);
-        hasNormal = true;
-      }
-      else if (name == "texture_metallic")
-      {
-        number = std::to_string(metallicNr++);
-        hasMetallic = true;
-      }
-      else if (name == "texture_roughness")
-      {
-        number = std::to_string(roughnessNr++);
-        hasRoughness = true;
-      }
-      else if (name == "texture_ao")
-      {
-        number = std::to_string(aoNr++);
-        hasAO = true;
-      }
-      else if (name == "texture_height")
-      {
-        number = std::to_string(heightNr++);
-        hasHeight = true;
-      }
-      else if (name == "texture_emissive")
-      {
-        number = std::to_string(emissiveNr++);
-        hasEmissive = true;
-      }
 
-      shader.setInt(("material." + name + number).c_str(), i);
-      shader.setInt((name + number).c_str(), i);
+      // The logic for name, number, and concatenation is gone!
+      shader.setInt(textures[i].uniformName.c_str(), i);
+
+      // Update the presence flags based on the texture type
+      const std::string &type = textures[i].type;
+
+      if (type == "texture_diffuse")
+        hasDiffuse = true;
+      else if (type == "texture_specular")
+        hasSpecular = true;
+      else if (type == "texture_normal")
+        hasNormal = true;
+      else if (type == "texture_metallic")
+        hasMetallic = true;
+      else if (type == "texture_roughness")
+        hasRoughness = true;
+      else if (type == "texture_ao")
+        hasAO = true;
+      else if (type == "texture_height")
+        hasHeight = true;
+      else if (type == "texture_emissive")
+        hasEmissive = true;
+
       glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
+
     // Provide presence flags the shaders can use
     shader.setBool("hasDiffuse", hasDiffuse);
     shader.setBool("hasSpecular", hasSpecular);
@@ -110,7 +88,6 @@ public:
     shader.setBool("hasAO", hasAO);
     shader.setBool("hasHeight", hasHeight);
     shader.setBool("hasEmissive", hasEmissive);
-    // std::cout << "Mesh " << this->name << ": has emissive? " << (hasEmissive ? "Yes" : "No") << std::endl;
 
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(VAO);
@@ -154,6 +131,51 @@ private:
 protected:
   //  render data
   unsigned int VAO, VBO, EBO;
+  void processTextures()
+  {
+    // Reset counters for uniform numbering
+    unsigned int diffuseNr = 1, specularNr = 1, normalNr = 1, heightNr = 1;
+    unsigned int metallicNr = 1, roughnessNr = 1, aoNr = 1, emissiveNr = 1;
+
+    for (auto &texture : textures)
+    {
+      std::string number;
+      const std::string &name = texture.type;
+
+      // Use a pointer to the correct counter for DRY principle
+      unsigned int *counter = nullptr;
+
+      if (name == "texture_diffuse")
+        counter = &diffuseNr;
+      else if (name == "texture_specular")
+        counter = &specularNr;
+      else if (name == "texture_normal")
+        counter = &normalNr;
+      else if (name == "texture_metallic")
+        counter = &metallicNr;
+      else if (name == "texture_roughness")
+        counter = &roughnessNr;
+      else if (name == "texture_ao")
+        counter = &aoNr;
+      else if (name == "texture_height")
+        counter = &heightNr;
+      else if (name == "texture_emissive")
+        counter = &emissiveNr;
+
+      // If a known type, generate the name and store it
+      if (counter)
+      {
+        number = std::to_string((*counter)++);
+        // Store the final calculated string
+        texture.uniformName = name + number;
+      }
+      // Handle unknown texture types if necessary
+      else
+      {
+        std::cerr << "Warning: Unknown texture type encountered: " << name << std::endl;
+      }
+    }
+  }
   void setupMesh()
   {
     glGenVertexArrays(1, &VAO);
