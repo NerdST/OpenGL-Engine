@@ -8,7 +8,7 @@
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui/imgui.h"
-#include <stb_image.h>
+#include "stb_image.h"
 
 #include <iostream>
 #include <vector>
@@ -22,11 +22,13 @@
 // Bloom parameters
 const float BLOOM_SCALE = 8.0f;
 
-#include <camera.h>
-#include <model.h>
-#include <primitives.h>
-#include <shader.h>
-#include <buffers.h>
+#include "camera.h"
+#include "model.h"
+#include "primitives.h"
+#include "shader.h"
+#include "buffers.h"
+#include "lights.h"
+#include "player/player.h"
 
 // Initialize static member
 std::map<std::string, Shader *> Shader::shaders;
@@ -42,7 +44,7 @@ void processInput(GLFWwindow *window);
 //                treeNode *nodes[]);
 // void ShaderEditor(SceneGraph *sg);
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer);
+               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights);
 unsigned int loadTexture(char const *path);
 ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 
@@ -60,6 +62,8 @@ bool mouseDisabled = false;
 // timing
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
+
+// player
 
 int main()
 {
@@ -147,10 +151,10 @@ int main()
   //                    "modelShader");
 
   // Shader modelShader("data/shaders/model.vs", "data/shaders/model.fs", "modelShader");
-  Shader modelShader(
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/model.vs").c_str(),
-      (std::string(RUNTIME_DATA_DIR) + "/shaders/model.fs").c_str(),
-      "modelShader");
+  // Shader modelShader(
+  //     (std::string(RUNTIME_DATA_DIR) + "/shaders/model.vs").c_str(),
+  //     (std::string(RUNTIME_DATA_DIR) + "/shaders/model.fs").c_str(),
+  //     "modelShader");
   // Model myModel("data/models/cow/source/sample-3d_glb.glb");
   Model cowModel(std::string(RUNTIME_DATA_DIR) + "/models/cow/source/sample-3d_glb.glb");
   cowModel.name = "cowModel";
@@ -297,14 +301,6 @@ int main()
     glBindVertexArray(0);
   }
 
-  struct PointLight
-  {
-    glm::vec3 pos{0.0f};
-    glm::vec3 color{1.0f};
-    float intensity{1.0f};
-    float radius{1.0f};
-    Sphere lightVolume{0.02f, 36, 18, {}}; // default sphere so PointLight is default-constructible
-  };
   // std::vector<PointLight> pointLights = {
   //     {{2.f, 2.f, 2.f}, {0.2f, 0.95f, 0.0f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})},
   //     {{-3.f, 1.5f, -2.f}, {0.0f, 0.0f, 1.f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})}};
@@ -313,19 +309,60 @@ int main()
   // pointLights.push_back({{2.f, 2.f, 2.f}, {.9f, 1.f, .85f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, .8f, .7f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
   // A warm white light
-  pointLights.push_back({{2.f, 2.f, 2.f}, {0.0f, 0.3f, 0.9f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})});
+  pointLights.push_back({{2.f, 2.f, 2.f}, {0.01f, 0.05f, 0.9f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // A cool white light
-  pointLights.push_back({{-3.f, 1.5f, -2.f}, {0.7f, 0.0f, 1.0f}, 9.0f, 5.f, Sphere(0.02f, 36, 18, {})});
+  pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, 0.01f, 0.03f}, 9.0f, 5.f, Sphere(0.02f, 36, 18, {})});
 
+  // Animation Player
+  Player player(190, 96); // 190 BPM, 96 TPQN
+
+  // create a simple trackw tih one clip
+  Sequence seq;
+  seq.keys.push_back(Keyframe(0, 0.0f, TweenType::LINEAR));
+  seq.keys.push_back(Keyframe(1, 1.0f, TweenType::EASE_OUT));
+  seq.keys.push_back(Keyframe(95, 0.0f, TweenType::STEP));
+  seq.keys.push_back(Keyframe(96, 0.0f, TweenType::STEP));
+
+  Clip clip(seq, 0);
+  clip.loop = true;
+  clip.name = "testClip1";
+
+  Track t;
+  t.clips.push_back(clip);
+  t.name = "testTrack1";
+
+  Clip clip2(seq, 48);
+  clip2.loop = true;
+  clip2.name = "testClip2";
+
+  Track t2;
+  t2.clips.push_back(clip2);
+  t2.name = "testTrack2";
+
+  player.addTrack(t);
+  player.addTrack(t2);
+  player.play();
+
+  float pointLightIntensity = 1.0f;
   // render loop
   // -----------
   while (!glfwWindowShouldClose(window))
   {
     // per-frame time logic
     // --------------------
-    float currentFrame = static_cast<float>(glfwGetTime());
+    double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
+    // pointLightIntensity = sinf(glfwGetTime() * 10.0f) * 0.5f + 0.5f;
+
+    // player update
+    // -------------
+    auto out = player.getCurrentTrackOutputs();
+    if (out && !out->empty())
+    {
+      pointLights[0].intensity = out->at(0) * 10.0f;
+      pointLights[1].intensity = out->at(1) * 10.0f;
+    }
 
     // input
     // -----
@@ -357,7 +394,8 @@ int main()
       modelMat = glm::scale(modelMat, glm::vec3(pl.radius));
       deferredGeometryShader.setMat4("model", modelMat);
       deferredGeometryShader.setBool("isLightVolume", true);
-      deferredGeometryShader.setVec3("lightColor", pl.color);
+      glm::vec3 lightIntensity = pl.color * pl.intensity;
+      deferredGeometryShader.setVec3("lightColor", lightIntensity);
       deferredGeometryShader.setFloat("emissiveStrength", pl.intensity);
       pl.lightVolume.Draw(deferredGeometryShader);
       deferredGeometryShader.setBool("isLightVolume", false);
@@ -417,6 +455,7 @@ uniform sampler2D gRoughAoEmiss;
       deferredLightingShader.setVec3(baseName + ".position", pointLights[i].pos);
       deferredLightingShader.setVec3(baseName + ".color", pointLights[i].color);
       deferredLightingShader.setFloat(baseName + ".intensity", pointLights[i].intensity);
+      deferredLightingShader.setFloat(baseName + ".runtimeIntensity", pointLightIntensity);
       deferredLightingShader.setFloat(baseName + ".radius", pointLights[i].radius);
     }
 
@@ -533,7 +572,7 @@ uniform sampler2D gRoughAoEmiss;
     // glDepthMask(GL_TRUE); // Re-enable depth writing
     // glDisable(GL_BLEND);
 
-    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer);
+    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, pointLights);
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
@@ -701,7 +740,7 @@ unsigned int loadTexture(char const *path)
 }
 
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer)
+               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights)
 {
   // Start the Dear ImGui frame
   ImGui_ImplOpenGL3_NewFrame();
@@ -861,10 +900,19 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
           gShader->saveShaders();
       }
     }
+
     ImGui::ColorEdit3(
-        "clear color",
-        (float *)&clear_color); // Edit 3 floats representing a color
+        "Light 1 Color",
+        glm::value_ptr(pointLights[0].color)); // Edit 3 floats representing a color
+    ImGui::ColorEdit3(
+        "Light 2 Color",
+        glm::value_ptr(pointLights[1].color)); // Edit 3 floats representing a color
     ImGui::End();
+
+    // ImGui::ColorEdit3(
+    //     "clear color",
+    //     (float *)&clear_color); // Edit 3 floats representing a color
+    // ImGui::End();
   }
 
   // Rendering

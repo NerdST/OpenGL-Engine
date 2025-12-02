@@ -198,6 +198,17 @@ struct GBuffer
     glBindTexture(GL_TEXTURE_2D, bufHDR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 
+    // Resize brightness texture
+    glBindTexture(GL_TEXTURE_2D, texBright);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    // Resize Ping-Pong buffers for bloom
+    for (unsigned int i = 0; i < 2; i++)
+    {
+      glBindTexture(GL_TEXTURE_2D, PingPongColorbuffers[i]);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width / BLOOM_SCALE, height / BLOOM_SCALE, 0, GL_RGBA, GL_FLOAT, nullptr);
+    }
+
 #ifdef DEBUG_MODE
     // Resize DEBUG textures
     glBindTexture(GL_TEXTURE_2D, texNormalDEBUG);

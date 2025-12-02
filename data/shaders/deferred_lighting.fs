@@ -9,6 +9,7 @@ struct PointLight {
     vec3 position;
     vec3 color;
     float intensity;
+    float runtimeIntensity;
     float radius;
 };
 
@@ -71,7 +72,7 @@ void main() {
         vec3 H = normalize(V + L);
         float dist = length(Lgt.position - fragPos);
         float attenuation = 1.0 / (1.0 + (dist * dist) / (Lgt.radius * Lgt.radius));
-        vec3 radiance = Lgt.color * Lgt.intensity * attenuation;
+        vec3 radiance = Lgt.color * Lgt.intensity * attenuation * Lgt.runtimeIntensity;
 
         float NdotL = max(dot(N, L), 0.0);
         float D = DistributionGGX(N, H, roughness);

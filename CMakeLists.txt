@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(Project1 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # helps VS Code IntelliSense
@@ -62,11 +62,19 @@ set(IMGUI_SOURCES
 		${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
+# Collect all C/C++ source files from src and include directories recursively
+file(GLOB_RECURSE PROJECT_SOURCES
+	${SRC_DIR}/*.cpp
+	${SRC_DIR}/*.c
+	# ${INC_DIR}/*.cpp
+	# ${INC_DIR}/*.c
+	${INC_DIR}/glad/src/glad.c
+	${INC_DIR}/player/*.cpp
+)
+
 add_executable(${PROJECT_NAME}
-		${SRC_DIR}/main.cpp
-		${SRC_DIR}/stb_image.cpp
-		${INC_DIR}/glad/src/glad.c
-		${IMGUI_SOURCES}
+	${PROJECT_SOURCES}
+	${IMGUI_SOURCES}
 )
 
 # Ensure the debugger (VS) starts in the executable directory so relative paths resolve to "./data"
@@ -143,10 +151,8 @@ set(CMAKE_USE_RELATIVE_PATHS ON)
 # Convenience: organize source groups (useful for IDEs)
 # ----------------------------------------------------------------------------
 source_group(TREE ${CMAKE_SOURCE_DIR} FILES
-		${SRC_DIR}/main.cpp
-		${SRC_DIR}/stb_image.cpp
-		${INC_DIR}/glad/src/glad.c
-		${IMGUI_SOURCES}
+	${PROJECT_SOURCES}
+	${IMGUI_SOURCES}
 )
 
 message(STATUS "Configured ${PROJECT_NAME} with C++${CMAKE_CXX_STANDARD}")
