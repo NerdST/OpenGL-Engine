@@ -16,6 +16,7 @@
 #include <array>
 #include <map>
 #include <string>
+#include <memory>
 
 #define DEBUG_MODE
 
@@ -29,6 +30,8 @@ const float BLOOM_SCALE = 8.0f;
 #include "buffers.h"
 #include "lights.h"
 #include "player/player.h"
+#include "player/audio_player.h"
+#include "player/video_player.h"
 
 // Initialize static member
 std::map<std::string, Shader *> Shader::shaders;
@@ -44,7 +47,8 @@ void processInput(GLFWwindow *window);
 //                treeNode *nodes[]);
 // void ShaderEditor(SceneGraph *sg);
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights);
+               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights,
+               AudioPlayer *audioPlayer = nullptr, VideoTexture *videoTexture = nullptr, float *videoEmissive = nullptr);
 unsigned int loadTexture(char const *path);
 ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 
@@ -125,6 +129,7 @@ int main()
   // configure global opengl state
   // -----------------------------
   glEnable(GL_DEPTH_TEST);
+
   // // glEnable(GL_CULL_FACE);
   // // glCullFace(GL_BACK);
   // // glFrontFace(GL_CCW);
@@ -226,7 +231,7 @@ int main()
   tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/lava-and-rock/lava-and-rock_emissive.png";
   tex.id = loadTexture(tex.path.c_str());
   pbrTextures.push_back(tex);
-  Plane pbrTestPlane(10.0f, 10.0f, pbrTextures);
+  Plane pbrTestPlane(100.0f, 100.0f, pbrTextures);
   pbrTestPlane.name = "pbrTestPlane";
 
   // PBR Plane Model
@@ -309,41 +314,125 @@ int main()
   // pointLights.push_back({{2.f, 2.f, 2.f}, {.9f, 1.f, .85f}, 1.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, .8f, .7f}, 0.9f, 5.f, Sphere(0.02f, 36, 18, {})});
   // A warm white light
-  pointLights.push_back({{2.f, 2.f, 2.f}, {0.01f, 0.05f, 0.9f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})});
+  pointLights.push_back({{2.f, 2.f, 2.f}, {0.85f, .9f, 1.f}, 10.f, 6.f, Sphere(0.02f, 36, 18, {})});
   // A cool white light
-  pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, 0.01f, 0.03f}, 9.0f, 5.f, Sphere(0.02f, 36, 18, {})});
+  pointLights.push_back({{-3.f, 1.5f, -2.f}, {1.f, 0.9f, 0.95f}, 9.0f, 5.f, Sphere(0.02f, 36, 18, {})});
+
+  // ============================================================
+  // Initialize Audio Player
+  // ============================================================
+  std::unique_ptr<AudioPlayer> audioPlayer = std::make_unique<AudioPlayer>();
+  std::string audioFile = std::string(RUNTIME_DATA_DIR) + "/audio/LV Sandals.mp3";
+
+  // ============================================================
+  // Initialize Video Texture (optional - for testing)
+  // ============================================================
+  std::unique_ptr<VideoTexture> videoTexture = std::make_unique<VideoTexture>();
+  std::string videoFile = std::string(RUNTIME_DATA_DIR) + "/videos/fire.mp4";
+  bool videoLoaded = videoTexture->load(videoFile, 1280, 720);
+
+  // Create dummy textures for video plane so Mesh::Draw() will set the correct flags
+  std::vector<Texture> videoPlaneTextures;
+  Texture vidTex;
+  vidTex.type = "texture_diffuse";
+  vidTex.id = 0; // Will be set in render loop
+  vidTex.path = "video";
+  vidTex.uniformName = "texture_diffuse1";
+  videoPlaneTextures.push_back(vidTex);
+
+  vidTex.type = "texture_emissive";
+  vidTex.uniformName = "texture_emissive1";
+  videoPlaneTextures.push_back(vidTex);
+
+  Plane videoPlane(4.0f, 2.25f, videoPlaneTextures); // 16:9 aspect ratio
+  videoPlane.name = "videoPlane";
 
   // Animation Player
   Player player(190, 96); // 190 BPM, 96 TPQN
 
-  // create a simple trackw tih one clip
-  Sequence seq;
-  seq.keys.push_back(Keyframe(0, 0.0f, TweenType::LINEAR));
-  seq.keys.push_back(Keyframe(1, 1.0f, TweenType::EASE_OUT));
-  seq.keys.push_back(Keyframe(95, 0.0f, TweenType::STEP));
-  seq.keys.push_back(Keyframe(96, 0.0f, TweenType::STEP));
+  // Snare track
+  // Musical timing: 96 ticks/beat, 48 ticks per eighth note
+  // Beats at: 0, 3/8, 6/8, 10/8, 13/8 (repeating every 2 bars = 16/8 = 768 ticks)
+  Sequence snareSeq;
+  snareSeq.keys.push_back(Keyframe(0, 0.0f, TweenType::LINEAR));
+  snareSeq.keys.push_back(Keyframe(1, 1.0f, TweenType::EASE_OUT)); // Quick attack
+  snareSeq.keys.push_back(Keyframe(96, 0.0f, TweenType::LINEAR));  // Decay by 2/8 note
 
-  Clip clip(seq, 0);
-  clip.loop = true;
-  clip.name = "testClip1";
+  snareSeq.keys.push_back(Keyframe(144, 0.0f, TweenType::LINEAR)); // 3/8 beat
+  snareSeq.keys.push_back(Keyframe(145, 1.0f, TweenType::EASE_OUT));
+  snareSeq.keys.push_back(Keyframe(240, 0.0f, TweenType::LINEAR));
 
-  Track t;
-  t.clips.push_back(clip);
-  t.name = "testTrack1";
+  snareSeq.keys.push_back(Keyframe(288, 0.0f, TweenType::LINEAR)); // 6/8 beat
+  snareSeq.keys.push_back(Keyframe(289, 1.0f, TweenType::EASE_OUT));
+  snareSeq.keys.push_back(Keyframe(384, 0.0f, TweenType::LINEAR));
 
-  Clip clip2(seq, 48);
-  clip2.loop = true;
-  clip2.name = "testClip2";
+  snareSeq.keys.push_back(Keyframe(456, 0.0f, TweenType::LINEAR)); // 19/16 pre-beat
+  snareSeq.keys.push_back(Keyframe(457, 0.5f, TweenType::EASE_OUT));
+  snareSeq.keys.push_back(Keyframe(479, 0.1f, TweenType::LINEAR));
 
-  Track t2;
-  t2.clips.push_back(clip2);
-  t2.name = "testTrack2";
+  snareSeq.keys.push_back(Keyframe(480, 0.0f, TweenType::LINEAR)); // 10/8 beat
+  snareSeq.keys.push_back(Keyframe(481, 1.0f, TweenType::EASE_OUT));
+  snareSeq.keys.push_back(Keyframe(576, 0.0f, TweenType::LINEAR));
 
-  player.addTrack(t);
-  player.addTrack(t2);
+  snareSeq.keys.push_back(Keyframe(624, 0.0f, TweenType::LINEAR)); // 13/8 beat
+  snareSeq.keys.push_back(Keyframe(625, 1.0f, TweenType::EASE_OUT));
+  snareSeq.keys.push_back(Keyframe(720, 0.0f, TweenType::LINEAR));
+
+  snareSeq.keys.push_back(Keyframe(768, 0.0f, TweenType::LINEAR)); // End at 16/8 (2 bars) for clean loop
+
+  Clip snareClip(snareSeq, 0);
+  snareClip.loop = true;
+  snareClip.name = "snareClip";
+
+  Track snareTrack;
+  snareTrack.clips.push_back(snareClip);
+  snareTrack.name = "snareTrack";
+
+  // Crash track
+  // Musical timing: 96 ticks/beat, 48 ticks per eighth note
+  // Beats at: 8/8 (repeating every 2 bars = 16/8 = 768 ticks)
+  Sequence crashSeq;
+  crashSeq.keys.push_back(Keyframe(0, 0.0f, TweenType::STEP));
+  crashSeq.keys.push_back(Keyframe(384, 1.0f, TweenType::EASE_OUT));
+  crashSeq.keys.push_back(Keyframe(768, 0.0f, TweenType::LINEAR)); // End at 16/8 (2 bars) for clean loop
+
+  Clip crashClip(crashSeq, 2304);
+  crashClip.loop = true;
+  crashClip.name = "crashClip";
+
+  Track crashTrack;
+  crashTrack.clips.push_back(crashClip);
+  crashTrack.name = "crashTrack";
+
+  player.addTrack(snareTrack);
+  player.addTrack(crashTrack);
+
+  // Lights player
   player.play();
 
+  // Audio player
+  if (audioPlayer->init(audioFile))
+  {
+    audioPlayer->play();
+    std::cout << "Background audio started" << std::endl;
+  }
+  else
+    std::cout << "Warning: Could not load audio file at " << audioFile << std::endl;
+
+  // Video player
+  if (videoLoaded)
+  {
+    videoTexture->play();
+    std::cout << "Video texture loaded and playing" << std::endl
+              << "Video texture ID: " << videoTexture->getTextureID() << std::endl
+              << "Video dimensions: " << videoTexture->getDimensions().x << "x" << videoTexture->getDimensions().y << std::endl;
+  }
+  else
+    std::cout << "Info: Video texture not available at " << videoFile << std::endl;
+
   float pointLightIntensity = 1.0f;
+  float videoEmissive = 1.0f; // Control brightness of animated texture
+
   // render loop
   // -----------
   while (!glfwWindowShouldClose(window))
@@ -353,6 +442,7 @@ int main()
     double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
+
     // pointLightIntensity = sinf(glfwGetTime() * 10.0f) * 0.5f + 0.5f;
 
     // player update
@@ -360,9 +450,13 @@ int main()
     auto out = player.getCurrentTrackOutputs();
     if (out && !out->empty())
     {
-      pointLights[0].intensity = out->at(0) * 10.0f;
+      pointLights[0].intensity = out->at(0) * 1.0f;
       pointLights[1].intensity = out->at(1) * 10.0f;
     }
+
+    // Update video texture
+    if (videoLoaded)
+      videoTexture->update();
 
     // input
     // -----
@@ -387,6 +481,29 @@ int main()
 
     cowModel.Draw(deferredGeometryShader);
     pbrTestPlane.Draw(deferredGeometryShader);
+
+    // Render video plane if video is loaded
+    if (videoLoaded && videoTexture && videoTexture->getTextureID() != 0)
+    {
+      // Set a simple bright material for the video plane
+      modelMat = glm::mat4(1.0f);
+      modelMat = glm::translate(modelMat, glm::vec3(0.0f, 4.0f, -8.0f));
+      modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+      modelMat = glm::scale(modelMat, glm::vec3(4.0f));
+      deferredGeometryShader.setMat4("model", modelMat);
+      deferredGeometryShader.setBool("isLightVolume", false);
+
+      // Update the dummy texture IDs so Mesh::Draw() will bind the correct video texture
+      // The textures vector is: [texture_diffuse1, texture_emissive1]
+      videoPlane.textures[0].id = videoTexture->getTextureID(); // Diffuse
+      videoPlane.textures[1].id = videoTexture->getTextureID(); // Emissive
+
+      // Set emissive strength uniform
+      deferredGeometryShader.setFloat("emissiveStrength", videoEmissive);
+
+      // Draw() will now bind the correct texture IDs and set hasDiffuse=true, hasEmissive=true
+      videoPlane.Draw(deferredGeometryShader);
+    }
     for (auto &pl : pointLights)
     {
       modelMat = glm::mat4(1.0f);
@@ -427,9 +544,15 @@ uniform sampler2D gNormal;
 uniform sampler2D gAlbedoMetal;
 uniform sampler2D gRoughAoEmiss;
     */
+    // Lighting pass -> HDR FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.HDRfbo);
+    GLenum hdrBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, hdrBuffers);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     // glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     deferredLightingShader.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     deferredLightingShader.setVec3("viewPos", camera.Position);
     // Bind GBuffer textures
     glActiveTexture(GL_TEXTURE0);
@@ -448,6 +571,7 @@ uniform sampler2D gRoughAoEmiss;
     glBindTexture(GL_TEXTURE_2D, gbuffer.texEmissive);
     deferredLightingShader.setInt("gEmissive", 4);
 
+    // Set light uniforms
     deferredLightingShader.setInt("uPointLightCount", (int)pointLights.size());
     for (size_t i = 0; i < pointLights.size(); i++)
     {
@@ -459,21 +583,20 @@ uniform sampler2D gRoughAoEmiss;
       deferredLightingShader.setFloat(baseName + ".radius", pointLights[i].radius);
     }
 
+    // Draw fullscreen quad into hdr FBO
+    glDisable(GL_DEPTH_TEST);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glEnable(GL_DEPTH_TEST);
+
     // Copy depth from GBuffer to default framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer.fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Lighting pass -> HDR FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer.HDRfbo);
-    GLenum hdrBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, hdrBuffers);
-    glClear(GL_COLOR_BUFFER_BIT);
-    deferredLightingShader.use();
-
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    // glBindVertexArray(quadVAO);
+    // glDrawArrays(GL_TRIANGLES, 0, 6);
 
     // =============== BLUR PASS =================
     bool horizontal = true, first_iteration = true;
@@ -572,13 +695,23 @@ uniform sampler2D gRoughAoEmiss;
     // glDepthMask(GL_TRUE); // Re-enable depth writing
     // glDisable(GL_BLEND);
 
-    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, pointLights);
+    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, pointLights, audioPlayer.get(), videoTexture.get(), &videoEmissive);
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
     // -------------------------------------------------------------------------------
     glfwSwapBuffers(window);
     glfwPollEvents();
+  }
+
+  // Cleanup audio and video
+  if (audioPlayer)
+  {
+    audioPlayer->stop();
+  }
+  if (videoTexture)
+  {
+    videoTexture->stop();
   }
 
   // Cleanup ImGui
@@ -740,7 +873,8 @@ unsigned int loadTexture(char const *path)
 }
 
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
-               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights)
+               float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights,
+               AudioPlayer *audioPlayer, VideoTexture *videoTexture, float *videoEmissive)
 {
   // Start the Dear ImGui frame
   ImGui_ImplOpenGL3_NewFrame();
@@ -913,6 +1047,87 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
     //     "clear color",
     //     (float *)&clear_color); // Edit 3 floats representing a color
     // ImGui::End();
+  }
+
+  // Audio and Video Controls Panel
+  if (audioPlayer || videoTexture)
+  {
+    ImGui::SetNextWindowPos(ImVec2(10, 600), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(350, 180), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Audio & Video Controls");
+
+    if (audioPlayer)
+    {
+      ImGui::Text("Audio Playback");
+      ImGui::Separator();
+
+      float volume = audioPlayer->getVolume();
+      if (ImGui::SliderFloat("Volume##audio", &volume, 0.0f, 2.0f, "%.2f"))
+      {
+        audioPlayer->setVolume(volume);
+      }
+
+      bool isPlaying = audioPlayer->isPlaying();
+      if (ImGui::Checkbox("Playing##audio", &isPlaying))
+      {
+        if (isPlaying)
+          audioPlayer->play();
+        else
+          audioPlayer->pause();
+      }
+
+      ImGui::SameLine();
+      if (ImGui::Button("Stop##audio"))
+      {
+        audioPlayer->stop();
+      }
+
+      ImGui::Text("Time: %.2f / %.2f s", audioPlayer->getCurrentTime(), audioPlayer->getDuration());
+
+      ImGui::Spacing();
+    }
+
+    if (videoTexture)
+    {
+      ImGui::Text("Video Playback");
+      ImGui::Separator();
+
+      bool videoPlaying = videoTexture->isPlaying();
+      if (ImGui::Checkbox("Playing##video", &videoPlaying))
+      {
+        if (videoPlaying)
+          videoTexture->play();
+        else
+          videoTexture->pause();
+      }
+
+      ImGui::SameLine();
+      if (ImGui::Button("Stop##video"))
+      {
+        videoTexture->stop();
+      }
+
+      float speed = 1.0f; // TODO: Add speed getter to VideoTexture if needed
+      if (ImGui::SliderFloat("Playback Speed##video", &speed, 0.25f, 2.0f, "%.2fx"))
+      {
+        videoTexture->setPlaybackSpeed(speed);
+      }
+
+      bool looping = true; // TODO: Add looping getter to VideoTexture if needed
+      if (ImGui::Checkbox("Loop##video", &looping))
+      {
+        videoTexture->setLooping(looping);
+      }
+
+      if (ImGui::SliderFloat("Emissive Brightness", videoEmissive, 0.0f, 2.0f, "%.2f"))
+      {
+        // Emissive strength is updated in render loop
+      }
+
+      ImGui::Text("Time: %.2f / %.2f s", videoTexture->getCurrentTime(), videoTexture->getDuration());
+    }
+
+    ImGui::End();
   }
 
   // Rendering

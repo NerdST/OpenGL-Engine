@@ -46,6 +46,19 @@ if (NOT assimp_FOUND)
 endif()
 
 # ----------------------------------------------------------------------------
+# FFmpeg (audio and video processing)
+# Try pkg-config to find FFmpeg libraries
+# ----------------------------------------------------------------------------
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+	libavformat
+	libavcodec
+	libswresample
+	libswscale
+	libavutil
+)
+
+# ----------------------------------------------------------------------------
 # Source files
 # ----------------------------------------------------------------------------
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
@@ -133,6 +146,21 @@ if (TARGET assimp::assimp)
     target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 elseif (ASSIMP_LIBRARIES)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${ASSIMP_LIBRARIES})
+endif()
+
+# Link FFmpeg libraries
+if (TARGET PkgConfig::FFMPEG)
+    target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::FFMPEG)
+endif()
+
+# Also link PulseAudio for audio output on Linux
+find_package(PkgConfig)
+if (PkgConfig_FOUND)
+	pkg_check_modules(PULSEAUDIO libpulse-simple)
+	if (PULSEAUDIO_FOUND)
+		target_link_libraries(${PROJECT_NAME} PRIVATE ${PULSEAUDIO_LIBRARIES})
+		target_include_directories(${PROJECT_NAME} PRIVATE ${PULSEAUDIO_INCLUDE_DIRS})
+	endif()
 endif()
 
 # ----------------------------------------------------------------------------
