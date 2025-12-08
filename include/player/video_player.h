@@ -89,6 +89,11 @@ public:
    */
   void setLooping(bool loop) { m_looping = loop; }
 
+  /**
+   * Cleanup FFmpeg and OpenGL resources
+   */
+  void cleanup();
+
 private:
   // OpenGL texture
   GLuint m_textureID{0};
@@ -138,11 +143,6 @@ private:
    * Decode next frame
    */
   bool decodeNextFrame();
-
-  /**
-   * Cleanup FFmpeg resources
-   */
-  void cleanup();
 
   /**
    * Update OpenGL texture with frame data

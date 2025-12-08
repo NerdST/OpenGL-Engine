@@ -16,11 +16,6 @@ VideoTexture::~VideoTexture()
 {
   stop();
   cleanup();
-
-  if (m_textureID != 0)
-  {
-    glDeleteTextures(1, &m_textureID);
-  }
 }
 
 bool VideoTexture::load(const std::string &filename, int width, int height)
@@ -359,6 +354,12 @@ void VideoTexture::updateGLTexture(const uint8_t *data)
 void VideoTexture::cleanup()
 {
   std::lock_guard<std::mutex> lock(m_mutex);
+
+  if (m_textureID != 0)
+  {
+    glDeleteTextures(1, &m_textureID);
+    m_textureID = 0;
+  }
 
   if (m_swsCtx)
   {

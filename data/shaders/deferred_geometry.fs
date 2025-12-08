@@ -1,7 +1,7 @@
 #version 330 core
 layout (location = 0) out vec4 gPosition;// xyz position, w = linear depth (32-bit float)
 layout (location = 1) out vec4 gNormal;// xyz normal, w = unused/packed (16-bit float or 8-bit unsigned norm)
-layout (location = 2) out vec4 gAlbedoSpec;// rgb albedo, a = specular/roughness (8-bit unsigned norm)
+layout (location = 2) out vec4 gAlbedo;// rgb albedo, a = alpha
 layout (location = 3) out vec4 gMatProps;// r = metallic, g = roughness, b = ambient occlusion (AO), a = height
 layout (location = 4) out vec4 gEmissive;// rgb emissive color, a = unused
 
@@ -18,7 +18,6 @@ in VS_OUT {
 } vs_out;
 
 uniform sampler2D texture_diffuse1;
-uniform sampler2D texture_specular1;
 uniform sampler2D texture_normal1;
 uniform sampler2D texture_metallic1;
 uniform sampler2D texture_height1;
@@ -106,10 +105,11 @@ void main() {
 
     vec3 normal = normalize(vs_out.TBN * normalMap);
 
-    vec3 albedo = hasDiffuse ? texture(texture_diffuse1, texCoords).rgb : vec3(1.0, 0.0, 1.0);
+    vec4 albedo = hasDiffuse ? texture(texture_diffuse1, texCoords) : vec4(1.0, 0.0, 1.0, 1.0);
     if (isLightVolume)
-        albedo = lightColor;
-    float specular = hasSpecular ? texture(texture_specular1, texCoords).r : 0.04;
+        albedo = vec4(lightColor * emissiveStrength, 1.0);
+    if (albedo.a < 0.5)
+        discard;
     float metallic = hasMetallic ? texture(texture_metallic1, texCoords).r : 0.0;
     float height = hasHeight ? texture(texture_height1, texCoords).r : 0.0;
     float roughness = hasRoughness ? texture(texture_roughness1, texCoords).r : 0.5;
@@ -122,7 +122,7 @@ void main() {
 
     gPosition = vec4(vs_out.FragPos, linearDepth(vs_out.FragPos));
     gNormal = vec4(normal, 1.);
-    gAlbedoSpec = vec4(albedo, specular);
+    gAlbedo = albedo;
     gMatProps = vec4(metallic, roughness, ao, height);
     gEmissive = vec4(emissive, 1.);
 }

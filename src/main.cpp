@@ -234,6 +234,15 @@ int main()
   Plane pbrTestPlane(100.0f, 100.0f, pbrTextures);
   pbrTestPlane.name = "pbrTestPlane";
 
+  // Transparency Test Plane
+  std::vector<Texture> transpTextures;
+  tex.type = "texture_diffuse";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/Redstone_Dust.png";
+  tex.id = loadTexture(tex.path.c_str());
+  transpTextures.push_back(tex);
+  Plane transparencyTestPlane(1.0f, 1.0f, transpTextures);
+  transparencyTestPlane.name = "transparencyTestPlane";
+
   // PBR Plane Model
 
   // std::cout << "Model loaded with " << myModel.meshes.size() << " meshes"
@@ -481,6 +490,12 @@ int main()
 
     cowModel.Draw(deferredGeometryShader);
     pbrTestPlane.Draw(deferredGeometryShader);
+    modelMat = glm::mat4(1.0f);
+    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 1.0f, -3.0f));
+    modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+    modelMat = glm::scale(modelMat, glm::vec3(2.0f));
+    deferredGeometryShader.setMat4("model", modelMat);
+    transparencyTestPlane.Draw(deferredGeometryShader);
 
     // Render video plane if video is loaded
     if (videoLoaded && videoTexture && videoTexture->getTextureID() != 0)
