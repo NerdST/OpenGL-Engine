@@ -48,7 +48,8 @@ void processInput(GLFWwindow *window);
 // void ShaderEditor(SceneGraph *sg);
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
                float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights,
-               AudioPlayer *audioPlayer = nullptr, VideoTexture *videoTexture = nullptr, float *videoEmissive = nullptr);
+               AudioPlayer *audioPlayer = nullptr, VideoTexture *videoTexture = nullptr, float *videoEmissive = nullptr,
+               Player *player = nullptr);
 unsigned int loadTexture(char const *path);
 ImVec4 clear_color = ImVec4(0.01, 0.01, 0.01, 1.00f);
 
@@ -57,7 +58,7 @@ unsigned int SCR_WIDTH = 1280;
 unsigned int SCR_HEIGHT = 720;
 
 // camera
-Camera camera(glm::vec3(5.0f, 1.0f, 5.0f));
+Camera camera(glm::vec3(0.0f, 0.5f, 10.0f));
 bool firstMouse = true;
 float lastX = (float)SCR_WIDTH / 2.0;
 float lastY = (float)SCR_HEIGHT / 2.0;
@@ -66,6 +67,9 @@ bool mouseDisabled = false;
 // timing
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
+
+// playback state
+bool playbackStarted = false;
 
 // player
 
@@ -235,13 +239,34 @@ int main()
   pbrTestPlane.name = "pbrTestPlane";
 
   // Transparency Test Plane
-  std::vector<Texture> transpTextures;
+  // std::vector<Texture> transpTextures;
+  // tex.type = "texture_diffuse";
+  // tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/Redstone_Dust.png";
+  // tex.id = loadTexture(tex.path.c_str());
+  // transpTextures.push_back(tex);
+  // Plane transparencyTestPlane(1.0f, 1.0f, transpTextures);
+  // transparencyTestPlane.name = "transparencyTestPlane";
+
+  // Floor PBR plane
+  std::vector<Texture> floorTextures;
   tex.type = "texture_diffuse";
-  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/Redstone_Dust.png";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/laminate-flooring-brown-unity/laminate-flooring-brown_albedo.png";
   tex.id = loadTexture(tex.path.c_str());
-  transpTextures.push_back(tex);
-  Plane transparencyTestPlane(1.0f, 1.0f, transpTextures);
-  transparencyTestPlane.name = "transparencyTestPlane";
+  floorTextures.push_back(tex);
+  tex.type = "texture_normal";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/laminate-flooring-brown-unity/laminate-flooring-brown_normal-ogl.png";
+  tex.id = loadTexture(tex.path.c_str());
+  floorTextures.push_back(tex);
+  tex.type = "texture_ao";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/laminate-flooring-brown-unity/laminate-flooring-brown_ao.png";
+  tex.id = loadTexture(tex.path.c_str());
+  floorTextures.push_back(tex);
+  tex.type = "texture_height";
+  tex.path = std::string(RUNTIME_DATA_DIR) + "/textures/pbr/laminate-flooring-brown-unity/laminate-flooring-brown_height.png";
+  tex.id = loadTexture(tex.path.c_str());
+  floorTextures.push_back(tex);
+  Plane floorPlane(10.0f, 10.0f, floorTextures);
+  floorPlane.name = "floorPlane";
 
   // PBR Plane Model
 
@@ -356,6 +381,28 @@ int main()
   Plane videoPlane(4.0f, 2.25f, videoPlaneTextures); // 16:9 aspect ratio
   videoPlane.name = "videoPlane";
 
+  // Finally ap lane for my character sprite
+  std::vector<Texture> characterTextures;
+  Texture charTex;
+  charTex.type = "texture_diffuse";
+  charTex.path = std::string(RUNTIME_DATA_DIR) + "/textures/neerija_dance/NeerijaDance_0000.png";
+  charTex.id = loadTexture(charTex.path.c_str());
+  characterTextures.push_back(charTex);
+  charTex.path = std::string(RUNTIME_DATA_DIR) + "/textures/neerija_dance/NeerijaDance_0001.png";
+  charTex.id = loadTexture(charTex.path.c_str());
+  characterTextures.push_back(charTex);
+  charTex.path = std::string(RUNTIME_DATA_DIR) + "/textures/neerija_dance/NeerijaDance_0002.png";
+  charTex.id = loadTexture(charTex.path.c_str());
+  characterTextures.push_back(charTex);
+  charTex.path = std::string(RUNTIME_DATA_DIR) + "/textures/neerija_dance/NeerijaDance_0003.png";
+  charTex.id = loadTexture(charTex.path.c_str());
+  characterTextures.push_back(charTex);
+
+  std::vector<Texture> currentCharacterTextures;
+  currentCharacterTextures.push_back(characterTextures[0]); // Start with first frame
+  Plane characterPlane(1.0f, 1.0f, currentCharacterTextures);
+  characterPlane.name = "characterPlane";
+
   // Animation Player
   Player player(190, 96); // 190 BPM, 96 TPQN
 
@@ -413,17 +460,31 @@ int main()
   crashTrack.clips.push_back(crashClip);
   crashTrack.name = "crashTrack";
 
+  Sequence charAnimSeq; // Every 4 beats (384 ticks) go from 0 to 4
+  charAnimSeq.keys.push_back(Keyframe(0, 0.0f, TweenType::LINEAR));
+  charAnimSeq.keys.push_back(Keyframe(384, 4.0f, TweenType::STEP));
+
+  Clip charAnimClip(charAnimSeq, 0);
+  charAnimClip.loop = true;
+  charAnimClip.name = "charAnimClip";
+
+  Track charAnimTrack;
+  charAnimTrack.clips.push_back(charAnimClip);
+  charAnimTrack.name = "charAnimTrack";
+
   player.addTrack(snareTrack);
   player.addTrack(crashTrack);
+  player.addTrack(charAnimTrack);
 
-  // Lights player
-  player.play();
+  // Don't auto-start players - wait for ImGui "Play All" button
+  // player.play();
 
   // Audio player
   if (audioPlayer->init(audioFile))
   {
-    audioPlayer->play();
-    std::cout << "Background audio started" << std::endl;
+    // Don't auto-start - wait for ImGui button
+    // audioPlayer->play();
+    std::cout << "Audio file loaded: " << audioFile << std::endl;
   }
   else
     std::cout << "Warning: Could not load audio file at " << audioFile << std::endl;
@@ -431,8 +492,9 @@ int main()
   // Video player
   if (videoLoaded)
   {
-    videoTexture->play();
-    std::cout << "Video texture loaded and playing" << std::endl
+    // Don't auto-start - wait for ImGui button
+    // videoTexture->play();
+    std::cout << "Video texture loaded" << std::endl
               << "Video texture ID: " << videoTexture->getTextureID() << std::endl
               << "Video dimensions: " << videoTexture->getDimensions().x << "x" << videoTexture->getDimensions().y << std::endl;
   }
@@ -461,6 +523,23 @@ int main()
     {
       pointLights[0].intensity = out->at(0) * 1.0f;
       pointLights[1].intensity = out->at(1) * 10.0f;
+
+      // Character animation frame update
+      if (out->size() > 2)
+      {
+        float charFrame = out->at(2);
+        int frameInt = static_cast<int>(std::round(charFrame)) % 4;
+        if (frameInt < 0)
+          frameInt = 0; // Safety check
+        if (frameInt >= 4)
+          frameInt = 3; // Safety check
+
+        // Update the diffuse texture directly in the textures vector
+        if (!characterPlane.textures.empty())
+        {
+          characterPlane.textures[0] = characterTextures[frameInt];
+        }
+      }
     }
 
     // Update video texture
@@ -488,21 +567,39 @@ int main()
     glm::mat4 modelMat(1.0f);
     deferredGeometryShader.setMat4("model", modelMat);
 
-    cowModel.Draw(deferredGeometryShader);
-    pbrTestPlane.Draw(deferredGeometryShader);
     modelMat = glm::mat4(1.0f);
-    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 1.0f, -3.0f));
-    modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f));
-    modelMat = glm::scale(modelMat, glm::vec3(2.0f));
+    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, 20.0f));
+    modelMat = glm::scale(modelMat, glm::vec3(0.5f));
     deferredGeometryShader.setMat4("model", modelMat);
-    transparencyTestPlane.Draw(deferredGeometryShader);
+    cowModel.Draw(deferredGeometryShader);
+    modelMat = glm::mat4(1.0f);
+    deferredGeometryShader.setMat4("model", modelMat);
+    pbrTestPlane.Draw(deferredGeometryShader);
+    // modelMat = glm::mat4(1.0f);
+    // modelMat = glm::translate(modelMat, glm::vec3(0.0f, 1.0f, -3.0f));
+    // modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+    // modelMat = glm::scale(modelMat, glm::vec3(2.0f));
+    // deferredGeometryShader.setMat4("model", modelMat);
+    // transparencyTestPlane.Draw(deferredGeometryShader);
+    modelMat = glm::mat4(1.0f);
+    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.01f, 0.0f));
+    deferredGeometryShader.setMat4("model", modelMat);
+    floorPlane.Draw(deferredGeometryShader);
+
+    // Character plane
+    modelMat = glm::mat4(1.0f);
+    modelMat = glm::translate(modelMat, glm::vec3(0.0f, 1.5, 0.0f));
+    modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    modelMat = glm::scale(modelMat, glm::vec3(3.0f));
+    deferredGeometryShader.setMat4("model", modelMat);
+    characterPlane.Draw(deferredGeometryShader);
 
     // Render video plane if video is loaded
     if (videoLoaded && videoTexture && videoTexture->getTextureID() != 0)
     {
       // Set a simple bright material for the video plane
       modelMat = glm::mat4(1.0f);
-      modelMat = glm::translate(modelMat, glm::vec3(0.0f, 4.0f, -8.0f));
+      modelMat = glm::translate(modelMat, glm::vec3(0.0f, 4.0f, -15.0f));
       modelMat = glm::rotate(modelMat, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
       modelMat = glm::scale(modelMat, glm::vec3(4.0f));
       deferredGeometryShader.setMat4("model", modelMat);
@@ -706,11 +803,10 @@ uniform sampler2D gRoughAoEmiss;
     //   lightVolumeShader.setVec3("lightColor", pl.color);
     //   pl.lightVolume.Draw(lightVolumeShader);
     // }
-
     // glDepthMask(GL_TRUE); // Re-enable depth writing
     // glDisable(GL_BLEND);
 
-    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, pointLights, audioPlayer.get(), videoTexture.get(), &videoEmissive);
+    drawIMGUI(window, camera, deltaTime, lastFrame, gbuffer, pointLights, audioPlayer.get(), videoTexture.get(), &videoEmissive, &player);
 
     // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
     // etc.)
@@ -889,12 +985,34 @@ unsigned int loadTexture(char const *path)
 
 void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
                float &lastFrame, GBuffer &gbuffer, std::vector<struct PointLight> &pointLights,
-               AudioPlayer *audioPlayer, VideoTexture *videoTexture, float *videoEmissive)
+               AudioPlayer *audioPlayer, VideoTexture *videoTexture, float *videoEmissive, Player *player)
 {
   // Start the Dear ImGui frame
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+
+  // Centralized Play Button (only shown before playback starts)
+  if (!playbackStarted)
+  {
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f - 75.0f, 50), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(150, 80), ImGuiCond_Always);
+    ImGui::Begin("Playback Control", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+
+    if (ImGui::Button("Play All", ImVec2(-1, 40)))
+    {
+      playbackStarted = true;
+      // Start all players
+      if (player)
+        player->play();
+      if (audioPlayer)
+        audioPlayer->play();
+      if (videoTexture)
+        videoTexture->play();
+    }
+
+    ImGui::End();
+  }
 
   // // Show a simple window that we create ourselves. We use a Begin/End pair
   // to created a named window.
@@ -1083,19 +1201,19 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
       }
 
       bool isPlaying = audioPlayer->isPlaying();
-      if (ImGui::Checkbox("Playing##audio", &isPlaying))
-      {
-        if (isPlaying)
-          audioPlayer->play();
-        else
-          audioPlayer->pause();
-      }
+      // if (ImGui::Checkbox("Playing##audio", &isPlaying))
+      // {
+      //   if (isPlaying)
+      //     audioPlayer->play();
+      //   else
+      //     audioPlayer->pause();
+      // }
 
-      ImGui::SameLine();
-      if (ImGui::Button("Stop##audio"))
-      {
-        audioPlayer->stop();
-      }
+      // ImGui::SameLine();
+      // if (ImGui::Button("Stop##audio"))
+      // {
+      //   audioPlayer->stop();
+      // }
 
       ImGui::Text("Time: %.2f / %.2f s", audioPlayer->getCurrentTime(), audioPlayer->getDuration());
 
@@ -1117,16 +1235,16 @@ void drawIMGUI(GLFWwindow *window, Camera &camera, float &deltaTime,
       }
 
       ImGui::SameLine();
-      if (ImGui::Button("Stop##video"))
-      {
-        videoTexture->stop();
-      }
+      // if (ImGui::Button("Stop##video"))
+      // {
+      //   videoTexture->stop();
+      // }
 
-      float speed = 1.0f; // TODO: Add speed getter to VideoTexture if needed
-      if (ImGui::SliderFloat("Playback Speed##video", &speed, 0.25f, 2.0f, "%.2fx"))
-      {
-        videoTexture->setPlaybackSpeed(speed);
-      }
+      // float speed = 1.0f; // TODO: Add speed getter to VideoTexture if needed
+      // if (ImGui::SliderFloat("Playback Speed##video", &speed, 0.25f, 2.0f, "%.2fx"))
+      // {
+      //   videoTexture->setPlaybackSpeed(speed);
+      // }
 
       bool looping = true; // TODO: Add looping getter to VideoTexture if needed
       if (ImGui::Checkbox("Loop##video", &looping))
